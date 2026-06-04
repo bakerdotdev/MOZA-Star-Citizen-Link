@@ -8,7 +8,7 @@ public sealed class NullForceFeedbackDevice : IForceFeedbackDevice
 
     public NullForceFeedbackDevice(string? status = null)
     {
-        _status = status ?? "Running without hardware output. Effects are logged for parser validation.";
+        _status = status ?? "Running without hardware output. Telemetry effects are preview-only.";
     }
 
     public string Name => "Preview output";

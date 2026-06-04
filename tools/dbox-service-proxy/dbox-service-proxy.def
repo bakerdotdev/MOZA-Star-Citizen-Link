@@ -1,0 +1,9 @@
+LIBRARY dbxService64
+EXPORTS
+    GetAvailableDevices
+    GetMotionServiceManager
+    ResetDevice
+    StartDeviceTest
+    StartLocationTest
+    StopDeviceTest
+    StopLocationTest

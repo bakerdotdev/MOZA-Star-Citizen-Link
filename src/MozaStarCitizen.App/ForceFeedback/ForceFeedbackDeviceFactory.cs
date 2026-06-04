@@ -8,30 +8,20 @@ public static class ForceFeedbackDeviceFactory
         var devices = new List<IForceFeedbackDevice>();
 
         var directInput = DirectInputForceFeedbackDevice.CreateIfAvailable();
-        var managedSdk = MozaSdkManagedForceFeedbackDevice.CreateIfAvailable();
-        var bridge = MozaSdkForceFeedbackDevice.CreateIfAvailable();
 
         switch (outputMode)
         {
             case ForceFeedbackOutputMode.DirectInput:
                 AddIfPresent(devices, directInput);
                 break;
-            case ForceFeedbackOutputMode.MozaSdk:
-                AddIfPresent(devices, managedSdk);
-                break;
-            case ForceFeedbackOutputMode.NativeBridge:
-                AddIfPresent(devices, bridge);
-                break;
             case ForceFeedbackOutputMode.Preview:
                 break;
             default:
                 AddIfPresent(devices, directInput);
-                AddIfPresent(devices, bridge);
-                AddIfPresent(devices, managedSdk);
                 break;
         }
 
-        devices.Add(new NullForceFeedbackDevice($"Output mode '{outputMode}' had no working hardware output. Effects are logged for parser validation."));
+        devices.Add(new NullForceFeedbackDevice($"Output mode '{outputMode}' had no working DirectInput hardware output. Effects are preview-only."));
 
         return new FallbackForceFeedbackDevice(devices);
     }

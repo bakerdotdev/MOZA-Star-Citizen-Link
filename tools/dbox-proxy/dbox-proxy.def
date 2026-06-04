@@ -1,0 +1,3 @@
+LIBRARY dbxLive64
+EXPORTS
+    GetEventHandler

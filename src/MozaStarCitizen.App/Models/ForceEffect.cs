@@ -4,7 +4,8 @@ public enum ForceEffectKind
 {
     PeriodicVibration,
     Bump,
-    StateVibration
+    StateVibration,
+    ConstantForce
 }
 
 public sealed record ForceEffect(

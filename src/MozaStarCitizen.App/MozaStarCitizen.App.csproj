@@ -13,8 +13,4 @@
     <Version>0.1.0</Version>
   </PropertyGroup>
 
-  <ItemGroup>
-    <None Update="event-patterns.json" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
 </Project>

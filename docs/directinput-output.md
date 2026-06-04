@@ -1,13 +1,18 @@
 # DirectInput Output
 
-The app tries Windows DirectInput force feedback before falling back to preview output. It enumerates attached game controllers with force feedback support, prefers devices with `MOZA`, `AB6`, or `AB9` in the name, and then creates effects for the three initial mappings.
+The app uses Windows DirectInput force feedback for AB6 hardware output. It enumerates attached force-feedback game controllers, prefers devices with `MOZA`, `AB6`, or `AB9` in the name, sets the simple two-axis absolute joystick data format, acquires the device, and creates DirectInput effects from telemetry-derived force requests.
 
-Current mappings:
+Current telemetry mappings:
 
-- Quantum spool: sine periodic effect, 34 Hz, finite duration from the parsed event pattern.
-- Landing/impact: short constant-force bump.
-- In-atmosphere: sustained sine periodic effect, 18 Hz, stopped by an atmosphere-exit event.
+- Engine rumble: sustained sine periodic effect with telemetry-controlled intensity/frequency.
+- Atmosphere/turbulence: sustained sine periodic effect at low intensity.
+- G-load: sustained sine periodic effect representing load pressure.
+- Boost/afterburner: short constant-force bump.
+- Impact/explosion/damage: short constant-force bump.
+- Weapon fire: short constant-force recoil pulse.
+- Landing gear/countermeasure: short periodic mechanical pulse.
+- Decouple/couple: short constant-force confirmation bump.
 
-DirectInput effect intensity is clamped to the normal `0..10000` force-feedback range. Sustained effects use a state key so repeated events replace the old effect instead of stacking force indefinitely.
+DirectInput effect intensity is clamped to the normal `0..10000` force-feedback range. Sustained effects use state keys so a new telemetry state update replaces the old effect instead of stacking force indefinitely.
 
-This path still depends on how the AB6 driver exposes the device to Windows. If the device does not advertise DirectInput force feedback, the app will use preview output unless a MOZA SDK bridge DLL is present.
+The MOZA wheelbase SDK output path was removed from active selection because the tested SDK APIs are wheelbase-specific and do not control the AB6. If the AB6 does not advertise DirectInput force feedback, the app falls back to preview output.

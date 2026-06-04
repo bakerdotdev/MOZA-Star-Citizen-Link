@@ -133,7 +133,7 @@ public sealed class DirectInputForceFeedbackDevice : IForceFeedbackDevice
 
         var createdEffect = effect.Kind switch
         {
-            ForceEffectKind.Bump => CreateBumpEffect(effect),
+            ForceEffectKind.Bump or ForceEffectKind.ConstantForce => CreateBumpEffect(effect),
             ForceEffectKind.PeriodicVibration or ForceEffectKind.StateVibration => CreatePeriodicEffect(effect),
             _ => CreatePeriodicEffect(effect)
         };

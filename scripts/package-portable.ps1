@@ -1,7 +1,6 @@
 param(
     [string]$Configuration = "Release",
-    [string]$Runtime = "win-x64",
-    [string]$MozaSdkPath = "D:\MOZA_SDK\MOZA_SDK\SDK_CSharp\x64"
+    [string]$Runtime = "win-x64"
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,21 +33,6 @@ if (-not (Test-Path (Join-Path $publishDir "MozaStarCitizen.exe"))) {
 
 Get-ChildItem $publishDir -Filter "*.pdb" -File | Remove-Item -Force
 
-$mozaSdkDlls = @("MOZA_API_CSharp.dll", "MOZA_API_C.dll", "MOZA_SDK.dll")
-if (Test-Path $MozaSdkPath) {
-    $missing = @($mozaSdkDlls | Where-Object { -not (Test-Path (Join-Path $MozaSdkPath $_)) })
-    if ($missing.Count -eq 0) {
-        $driverDir = Join-Path $publishDir "drivers\moza-sdk\x64"
-        New-Item -ItemType Directory -Path $driverDir -Force | Out-Null
-        foreach ($dll in $mozaSdkDlls) {
-            Copy-Item -Path (Join-Path $MozaSdkPath $dll) -Destination $driverDir -Force
-        }
-        Write-Host "Bundled MOZA SDK runtime from $MozaSdkPath"
-    } else {
-        Write-Warning "MOZA SDK path exists but is missing: $($missing -join ', ')"
-    }
-}
-
 function Write-Launcher {
     param(
         [string]$Name,
@@ -71,9 +55,8 @@ function Write-Launcher {
 
 Write-Launcher "Run-Auto.cmd" ""
 Write-Launcher "Run-DirectInput.cmd" "DirectInput"
-Write-Launcher "Run-MozaSdk.cmd" "MozaSdk"
 Write-Launcher "Run-Preview.cmd" "Preview"
-Write-Launcher "Run-Screen.cmd" "DirectInput" @("MOZA_SC_SCREEN=1")
+Write-Launcher "Run-DBoxTelemetry.cmd" "DirectInput" @("MOZA_SC_TELEMETRY=DBoxHaptiSync")
 
 if (Test-Path $zipPath) {
     Remove-Item $zipPath -Force

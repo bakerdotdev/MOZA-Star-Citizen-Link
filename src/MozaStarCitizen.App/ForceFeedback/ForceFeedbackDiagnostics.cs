@@ -1,4 +1,3 @@
-using System.IO;
 using MozaStarCitizen.App.ForceFeedback.DirectInput;
 
 namespace MozaStarCitizen.App.ForceFeedback;
@@ -15,20 +14,12 @@ public static class ForceFeedbackDiagnostics
             $"Selected output: {selectedDevice.Name}",
             $"Output status: {selectedDevice.Status}"
         };
-
-        var bridgePath = Path.Combine(AppContext.BaseDirectory, "drivers", "MozaForceBridge.dll");
-        var managedSdkPath = Path.Combine(AppContext.BaseDirectory, "drivers", "moza-sdk", "x64", "MOZA_API_CSharp.dll");
-        lines.Add(File.Exists(managedSdkPath)
-            ? $"MOZA C# SDK: found at {managedSdkPath}"
-            : $"MOZA C# SDK: not found at {managedSdkPath}");
-        lines.Add("MOZA SDK product query: disabled because this racing SDK can terminate the process when probing unsupported devices.");
-        lines.Add(File.Exists(bridgePath)
-            ? $"MOZA SDK bridge: found at {bridgePath}"
-            : $"MOZA SDK bridge: not found at {bridgePath}");
+        lines.Add("AB6 output path: Windows DirectInput force feedback.");
+        lines.Add("MOZA wheelbase SDK output path: removed from active selection because it does not control the AB6.");
 
         if (!includeExtendedDiagnostics)
         {
-            lines.Add("Press Refresh to probe MOZA SDK devices and DirectInput controllers.");
+            lines.Add("Press Refresh to probe DirectInput controllers.");
             return lines;
         }
 

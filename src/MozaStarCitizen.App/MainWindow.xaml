@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="MOZA Star Citizen Link"
+        Title="MOZA Star Citizen Telemetry"
         Height="560"
         MinHeight="500"
         Width="920"
@@ -19,13 +19,9 @@
         </Grid.RowDefinitions>
 
         <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,14">
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <Button Content="Auto-detect" Command="{Binding AutoDetectCommand}" MinWidth="96" Margin="0,0,8,0" />
-                <Button Content="Browse" Command="{Binding BrowseCommand}" MinWidth="78" />
-            </StackPanel>
             <StackPanel>
-                <TextBlock Text="MOZA Star Citizen Link" FontSize="22" FontWeight="SemiBold" Foreground="#17212B" />
-                <TextBlock Text="Portable log-driven force feedback bridge" FontSize="13" Foreground="#5B6673" />
+                <TextBlock Text="MOZA Star Citizen Telemetry" FontSize="22" FontWeight="SemiBold" Foreground="#17212B" />
+                <TextBlock Text="Telemetry-first force feedback bridge for the AB6 DirectInput output path" FontSize="13" Foreground="#5B6673" />
             </StackPanel>
         </DockPanel>
 
@@ -41,8 +37,12 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="Game.log" FontWeight="SemiBold" Foreground="#2A3440" Margin="0,0,10,8" />
-                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding GameLogPath, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True" Margin="0,0,0,8" />
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Telemetry" FontWeight="SemiBold" Foreground="#2A3440" Margin="0,0,10,8" />
+                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,8">
+                    <TextBlock Text="{Binding TelemetryName}" Foreground="#17212B" FontWeight="SemiBold" />
+                    <TextBlock Text=" - " Foreground="#7A8694" />
+                    <TextBlock Text="{Binding TelemetryStatus}" Foreground="#5B6673" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
 
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Output" FontWeight="SemiBold" Foreground="#2A3440" Margin="0,0,10,8" />
                 <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,8">
@@ -58,20 +58,21 @@
 
         <DockPanel Grid.Row="2" Margin="0,0,0,12">
             <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
-                <Button Content="Start Monitoring" Command="{Binding StartCommand}" MinWidth="128" Margin="0,0,8,0" />
-                <Button Content="Stop" Command="{Binding StopCommand}" MinWidth="74" Margin="0,0,18,0" />
+                <Button Content="Start Telemetry" Command="{Binding StartCommand}" MinWidth="128" Margin="0,0,8,0" />
+                <Button Content="Stop" Command="{Binding StopCommand}" MinWidth="74" Margin="0,0,8,0" />
+                <Button Content="Stop Effects" Command="{Binding StopEffectsCommand}" MinWidth="104" />
             </StackPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <Button Content="Test Quantum" Command="{Binding TestQuantumCommand}" MinWidth="112" Margin="0,0,8,0" />
+                <Button Content="Test Engine" Command="{Binding TestEngineCommand}" MinWidth="104" Margin="0,0,8,0" />
                 <Button Content="Test Impact" Command="{Binding TestImpactCommand}" MinWidth="104" Margin="0,0,8,0" />
-                <Button Content="Test Atmo" Command="{Binding TestAtmosphereCommand}" MinWidth="96" />
+                <Button Content="Test Boost" Command="{Binding TestBoostCommand}" MinWidth="96" />
             </StackPanel>
         </DockPanel>
 
         <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="320" />
+                <ColumnDefinition Width="340" />
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0" Background="White" BorderBrush="#D7DDE4" BorderThickness="1" Margin="0,0,12,0">
@@ -80,7 +81,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <TextBlock Text="Event Feed" FontWeight="SemiBold" Foreground="#2A3440" Margin="14,12,14,8" />
+                    <TextBlock Text="Telemetry Feed" FontWeight="SemiBold" Foreground="#2A3440" Margin="14,12,14,8" />
                     <ListBox Grid.Row="1"
                              ItemsSource="{Binding Events}"
                              BorderThickness="0"
@@ -91,11 +92,11 @@
             </Border>
 
             <Border Grid.Column="1" Background="White" BorderBrush="#D7DDE4" BorderThickness="1">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
                     <DockPanel Margin="14,12,14,8">
                         <Button DockPanel.Dock="Right"
                                 Content="Refresh"
@@ -103,14 +104,14 @@
                                 MinWidth="72" />
                         <TextBlock Text="Diagnostics" FontWeight="SemiBold" Foreground="#2A3440" VerticalAlignment="Center" />
                     </DockPanel>
-                <ListBox Grid.Row="1"
+                    <ListBox Grid.Row="1"
                              ItemsSource="{Binding Diagnostics}"
-                         BorderThickness="0"
-                         FontFamily="Consolas"
-                         FontSize="12"
-                         Foreground="#17212B" />
-            </Grid>
-        </Border>
+                             BorderThickness="0"
+                             FontFamily="Consolas"
+                             FontSize="12"
+                             Foreground="#17212B" />
+                </Grid>
+            </Border>
         </Grid>
     </Grid>
 </Window>

@@ -1,22 +1,24 @@
-# MOZA Star Citizen Link
+# MOZA Star Citizen Telemetry
 
-Windows desktop app that watches Star Citizen `Game.log` and maps selected game events to force-feedback effects on a MOZA AB6 FFB flight base.
+Windows desktop app that maps Star Citizen telemetry signals to force-feedback effects on a MOZA AB6 FFB flight base.
 
-Current first-pass effects:
-
-- Quantum spool vibration
-- Landing and impact bumps
-- In-atmosphere vibration
+The app is now telemetry-first. The old `Game.log` parser and experimental screen-capture detector have been removed. The current input path tries to discover Star Citizen telemetry through D-BOX HaptiSync's local API, and it also supports a configurable JSON telemetry URL for any official/public channel CIG exposes later.
 
 ## Current Status
 
-The working hardware path is Windows DirectInput force feedback. The AB6 should appear to Windows as:
+The working hardware output path is Windows DirectInput force feedback. The AB6 should appear to Windows as:
 
 ```text
 MOZA AB6 FFB Base
 ```
 
-The MOZA SDK runtime is bundled by the package script when available, but the SDK force-feedback APIs in the tested SDK are wheelbase-oriented (`createWheelbaseET...`) and currently return `NODEVICES` for the AB6. For the AB6, use `Run-Auto.cmd` or `Run-DirectInput.cmd`.
+D-BOX HaptiSync Center 1.3.0 added a local REST API at:
+
+```text
+http://localhost:42010/index.html
+```
+
+That public API currently appears to expose haptic settings/control, not raw Star Citizen telemetry frames. This app probes the local Swagger/OpenAPI surface and will start reading a likely telemetry endpoint if one appears. Until then, the D-BOX path is a discovery/watch path rather than a confirmed telemetry feed.
 
 ## Download And Run
 
@@ -28,39 +30,66 @@ Extract the portable ZIP and run:
 Run-Auto.cmd
 ```
 
-If needed, the ZIP also includes launchers for specific output paths:
+Launchers:
 
-- `Run-Auto.cmd` - recommended; prefers DirectInput AB6 output
-- `Run-DirectInput.cmd` - force Windows DirectInput
-- `Run-MozaSdk.cmd` - force the MOZA SDK path; not currently expected to work with AB6
-- `Run-Preview.cmd` - no hardware output; useful for parser/UI testing
-- `Run-Screen.cmd` - experimental DirectInput mode with screen-capture impact and atmosphere detection
+- `Run-Auto.cmd` - recommended; D-BOX/API telemetry discovery with DirectInput AB6 output
+- `Run-DirectInput.cmd` - force Windows DirectInput output
+- `Run-DBoxTelemetry.cmd` - force D-BOX HaptiSync telemetry discovery mode
+- `Run-Preview.cmd` - no hardware output
 
 No installer is required. The release build is self-contained and does not require users to install the .NET runtime.
 
-## Star Citizen Log Setup
+## Telemetry Inputs
 
-The app tries to auto-detect `Game.log` in common Star Citizen install locations. If your game is installed somewhere else, use `Browse` once and select the file manually.
+Default mode:
 
-When monitoring starts, the app tails new log lines from that point forward. It does not replay old log lines.
+```text
+MOZA_SC_TELEMETRY=Auto
+```
 
-## Experimental Screen Capture
+Supported modes:
 
-`Run-Screen.cmd` enables `MOZA_SC_SCREEN=1`. In this mode the app samples the visible Star Citizen window and looks for sudden visual impact flashes or screen-motion changes, then maps those candidates to the normal landing/impact bump effect.
+```text
+Auto
+DBoxHaptiSync
+OfficialHttp
+Preview
+```
 
-The same experimental screen path also looks for the right-side boxed decimal altimeter readout. When that boxed readout is detected for several consecutive frames it starts the in-atmosphere rumble; when the readout is absent for several seconds it stops the rumble. A visible cursor suppresses screen-triggered effects so menus do not create rumble.
+To test a future official/public JSON telemetry endpoint:
 
-This does not read Star Citizen memory or inject into the game process. It is experimental and may need threshold tuning for different displays, graphics settings, and HUD scenes.
+```powershell
+$env:MOZA_SC_TELEMETRY="OfficialHttp"
+$env:MOZA_SC_TELEMETRY_URL="http://localhost:12345/telemetry"
+dotnet run --project src\MozaStarCitizen.App\MozaStarCitizen.App.csproj
+```
+
+The JSON mapper intentionally accepts loose field names so early telemetry payloads can be tested without recompiling. It looks for signal names such as `engineRumble`, `engineVibration`, `thrust`, `boost`, `afterburner`, `impact`, `weaponFire`, `landingGear`, `countermeasure`, `decoupled`, and G-force/acceleration fields.
+
+## Force Feedback Mapping
+
+Current telemetry-driven effects:
+
+- Engine rumble: sustained periodic vibration
+- Atmosphere/turbulence: sustained low-amplitude vibration
+- G-load: sustained pressure vibration
+- Boost/afterburner: transient kick plus stronger engine rumble
+- Impact/explosion/damage: short bump
+- Weapon fire: short recoil pulse
+- Landing gear/countermeasure: short mechanical pulse
+- Decouple/couple change: short confirmation bump
+
+The `Stop Effects` button stops all sustained and transient effects.
 
 ## Diagnostics
 
 Click `Refresh` in the app to see:
 
+- Selected telemetry mode and source status
+- D-BOX HaptiSync API discovery results
 - Selected output mode
 - DirectInput game controllers
 - DirectInput force-feedback devices
-- Log file path
-- Bundled MOZA SDK runtime status
 
 For AB6 output to work, diagnostics should list `MOZA AB6 FFB Base` under DirectInput force-feedback devices.
 
@@ -70,6 +99,22 @@ Runtime logs are written to:
 %LOCALAPPDATA%\MozaStarCitizen\app.log
 ```
 
+For deeper D-BOX telemetry discovery, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\collect-dbox-discovery.ps1 -CaptureFirst -EnablePacketTrace -InstallPktMonPortFilters -PacketTraceSeconds 180 -SampleSeconds 60
+```
+
+Run that from an elevated PowerShell with Star Citizen closed, then launch Star Citizen while capture is active and trigger engine, boost, weapon, gear, countermeasure, and impact events. If you are not already elevated, `scripts\start-dbox-discovery-elevated.ps1` opens the same capture in a UAC-elevated PowerShell window. The script writes a discovery text report plus packet summary, hex dump, and PCAPNG files under `artifacts\`.
+
+To directly test the configured D-BOX LiveMotion receiver port, close Star Citizen and run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\probe-dbox-receiver-port.ps1 -DurationSeconds 240
+```
+
+Then launch Star Citizen while the probe is active. Any TCP/UDP bytes sent to `127.0.0.1:61666` are logged under `artifacts\`.
+
 ## Development
 
 Requirements:
@@ -77,6 +122,7 @@ Requirements:
 - Windows
 - .NET SDK 8 or newer
 - MOZA AB6 FFB Base for hardware testing
+- Optional: D-BOX HaptiSync Center 1.3.0 or newer for API discovery
 
 Build:
 
@@ -96,40 +142,13 @@ Create a portable ZIP:
 .\scripts\package-portable.ps1
 ```
 
-By default, the package script looks for the local MOZA C# SDK runtime at:
-
-```text
-D:\MOZA_SDK\MOZA_SDK\SDK_CSharp\x64
-```
-
-The SDK DLLs are not committed to this repository. If present locally, these files are copied into the portable build under `drivers\moza-sdk\x64`.
-
-## Event Patterns
-
-Event matching lives in:
-
-```text
-src\MozaStarCitizen.App\event-patterns.json
-```
-
-The file is copied next to the executable, so patterns can be adjusted without changing code. Current patterns are provisional and should be refined with real Star Citizen log lines from current builds.
-
-## Known Limitations
-
-- Event patterns need validation against real Star Citizen `Game.log` output.
-- Effect strength, direction, duration, and frequency are first-pass values.
-- Sustained effects currently stop through matching end events or monitor stop; a dedicated `Stop Effects` UI control is a likely next improvement.
-- The MOZA SDK wheelbase force-feedback path is retained for diagnostics/experimentation, but AB6 output should use DirectInput.
-
 ## Project Layout
 
 ```text
-src/MozaStarCitizen.App/        WPF app
+src/MozaStarCitizen.App/             WPF app
+src/MozaStarCitizen.App/Telemetry/   D-BOX/API discovery and JSON telemetry readers
 src/MozaStarCitizen.App/ForceFeedback/
-                                DirectInput, MOZA SDK, fallback, and preview output
-src/MozaStarCitizen.App/Parsing/
-                                Game.log event parser
-src/MozaStarCitizen.App/Log/    Game.log discovery and tailing
-scripts/package-portable.ps1    Self-contained Windows release package
-docs/                           Lower-level implementation notes
+                                     DirectInput, fallback, and preview output
+scripts/package-portable.ps1         Self-contained Windows release package
+docs/                                Lower-level implementation notes
 ```

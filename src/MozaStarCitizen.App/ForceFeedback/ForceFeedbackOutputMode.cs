@@ -4,7 +4,5 @@ public enum ForceFeedbackOutputMode
 {
     Auto,
     DirectInput,
-    MozaSdk,
-    NativeBridge,
     Preview
 }
