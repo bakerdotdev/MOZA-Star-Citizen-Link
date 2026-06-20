@@ -2,6 +2,31 @@
 
 The app is designed around `IStarCitizenTelemetrySource`. A source initializes itself, exposes diagnostics, and streams `StarCitizenTelemetryFrame` values. The force-feedback controller only depends on those normalized frames, so future telemetry channels can be added without rewriting the AB6 output path.
 
+## Audio DSP (default)
+
+`AudioDspTelemetrySource` derives force-feedback signals from Star Citizen's own audio. It is the default `Auto` source and the one to use day to day, because it requires no D-BOX software, no process injection, and no anti-cheat-adjacent access — it only reads the system audio loopback.
+
+Pipeline:
+
+1. `NAudio.Wave.WasapiLoopbackCapture` captures the default render endpoint (override with `MOZA_SC_AUDIO_DEVICE`).
+2. Frames are downmixed to mono and scaled by `MOZA_SC_AUDIO_GAIN`.
+3. `AudioTelemetryAnalyzer` runs a 2048-point FFT with 50% overlap (~47 windows/sec) and computes:
+   - **Engine rumble** — RMS of the 30–160 Hz band mapped through a dB window, with attack/release smoothing.
+   - **Engine frequency** — spectral centroid of the engine band folded into a 12–55 Hz tactile range.
+   - **Atmosphere** — RMS of the 2–8 kHz band (slow envelope so transients don't inflate it).
+   - **Impact** — spectral flux in 40–200 Hz, compared against a slow running average so detection is volume-independent.
+   - **Weapon fire** — spectral flux in 1.5–6 kHz, same onset method.
+   - **Boost** — a conservative detector: sustained engine loudness well above its slow baseline.
+4. Each window is emitted as a `StarCitizenTelemetryFrame` over a bounded `Channel` (drop-oldest) so the audio thread never blocks.
+
+What it cannot provide: G-force/attitude, landing gear, countermeasure, and decouple state are not recoverable from audio and are left unset. Those would come from the optional `Game.log` augmentation or from the D-BOX coded-telemetry path (see `dbox-telemetry-research.md`).
+
+Known cross-talk: a single mixed stream means loud broadband sounds bleed across channels (sustained gunfire raises atmosphere; explosions fire both impact and weapon; the onset of engine rumble fires a one-shot impact). The `ForceFeedbackController` debounce windows absorb most of this. Tightening it further requires tuning against real game audio, not synthetic tones.
+
+Tuning: the band edges, dB windows, and flux thresholds are named constants at the top of `AudioTelemetryAnalyzer`. `GetDiagnosticsAsync` reports the live engine/air dB, the impact/weapon flux ratios, and the latest signal values — use those readings to set `MOZA_SC_AUDIO_GAIN` and, if needed, adjust the constants.
+
+Context gating: by default the audio path only drives feedback when Star Citizen is in an active flight context, so menu music or other audio can't cause phantom FFB. `GameLogContextWatcher` tails `Game.log` and tracks "a vehicle was spawned" vs. "returned to menu / shut down," falling back to "is `StarCitizen.exe` running" when no log is found. It **fails open** — feedback is allowed whenever context is uncertain, so real flight is never wrongly muted; it only suppresses on high-confidence non-flight states. Disable with `MOZA_SC_CONTEXT_GATE=0`; set `MOZA_SC_GAMELOG` to the log path if auto-detection misses your install.
+
 ## D-BOX HaptiSync
 
 `DBoxHaptiSyncTelemetrySource` connects to:

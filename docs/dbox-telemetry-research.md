@@ -1,5 +1,7 @@
 # D-BOX Telemetry Capture — Goal & Research State
 
+> **STATUS (2026-06-11): PARKED — pending real D-BOX hardware.** Software-only spoofing cracked the enumeration gate but cannot pass the system-generation classifier / MonitorServicePassthrough (these need real-device data; the deciding logic is in a NativeAOT binary). **Start with [`dbox-handoff.md`](dbox-handoff.md)** for the current state and the exact resume plan. Everything below is deeper background.
+
 This document captures the goal, the current understanding of the D-BOX/Star Citizen integration, and the open avenues for capturing Star Citizen telemetry by way of D-BOX. It is intended to let us resume this thread later without re-deriving everything.
 
 It supersedes the (now-obsolete) approach described in `dbox-proxy.md`. See "What We've Ruled Out" below for why.

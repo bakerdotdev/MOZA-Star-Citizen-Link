@@ -84,6 +84,9 @@ public sealed class ForceFeedbackController
             updates,
             cancellationToken);
 
+        // Afterburner engaging gives one soft kick (the sustained surge comes
+        // through the engine-rumble intensity above). Gentle so it's a swell, not
+        // a collision-grade jolt.
         var boostIntensity = Clamp01(Math.Max(frame.Boost, frame.Afterburner));
         if (boostIntensity > 0.35 &&
             _lastBoostSignal <= 0.35 &&
@@ -92,8 +95,8 @@ public sealed class ForceFeedbackController
             await _device.PlayAsync(new ForceEffect(
                 ForceEffectKind.Bump,
                 "Telemetry boost kick",
-                QuantizeIntensity(0.35 + boostIntensity * 0.45),
-                TimeSpan.FromMilliseconds(180),
+                QuantizeIntensity(0.2 + boostIntensity * 0.2),
+                TimeSpan.FromMilliseconds(160),
                 0,
                 null), cancellationToken);
             _lastBoostPulse = frame.Timestamp;
@@ -102,12 +105,15 @@ public sealed class ForceFeedbackController
 
         _lastBoostSignal = boostIntensity;
 
-        if (frame.Impact > 0.04 && frame.Timestamp - _lastImpact >= DuplicateImpactWindow)
+        // Impact = collisions only. High trigger so weapon/afterburner transients
+        // (small impact cross-talk) don't jolt; intensity scales from the hit so
+        // real collisions stay punchy.
+        if (frame.Impact > 0.35 && frame.Timestamp - _lastImpact >= DuplicateImpactWindow)
         {
             await _device.PlayAsync(new ForceEffect(
                 ForceEffectKind.Bump,
                 "Telemetry impact",
-                QuantizeIntensity(Math.Max(0.25, frame.Impact)),
+                QuantizeIntensity(Math.Max(0.3, frame.Impact)),
                 TimeSpan.FromMilliseconds(220),
                 0,
                 null), cancellationToken);
@@ -117,11 +123,12 @@ public sealed class ForceFeedbackController
 
         if (frame.WeaponFire > 0.05 && frame.Timestamp - _lastWeaponFire >= DuplicateWeaponWindow)
         {
+            // A distinct recoil pop, clearly above the sustained engine rumble.
             await _device.PlayAsync(new ForceEffect(
                 ForceEffectKind.Bump,
                 "Telemetry weapon recoil",
-                QuantizeIntensity(0.18 + frame.WeaponFire * 0.45),
-                TimeSpan.FromMilliseconds(70),
+                QuantizeIntensity(0.28 + frame.WeaponFire * 0.5),
+                TimeSpan.FromMilliseconds(110),
                 0,
                 null), cancellationToken);
             _lastWeaponFire = frame.Timestamp;

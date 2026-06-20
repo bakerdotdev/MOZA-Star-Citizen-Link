@@ -12,7 +12,7 @@ public static class ForceFeedbackDiagnostics
         {
             $"Output mode: {Environment.GetEnvironmentVariable("MOZA_SC_OUTPUT") ?? "Auto"}",
             $"Selected output: {selectedDevice.Name}",
-            $"Output status: {selectedDevice.Status}"
+            $"Output fallback order: {selectedDevice.Status}"
         };
         lines.Add("AB6 output path: Windows DirectInput force feedback.");
         lines.Add("MOZA wheelbase SDK output path: removed from active selection because it does not control the AB6.");

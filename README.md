@@ -2,7 +2,11 @@
 
 Windows desktop app that maps Star Citizen telemetry signals to force-feedback effects on a MOZA AB6 FFB flight base.
 
-The app is now telemetry-first. The old `Game.log` parser and experimental screen-capture detector have been removed. The current input path tries to discover Star Citizen telemetry through D-BOX HaptiSync's local API, and it also supports a configurable JSON telemetry URL for any official/public channel CIG exposes later.
+The app is now telemetry-first. The old `Game.log` parser and experimental screen-capture detector have been removed.
+
+The default input path derives force-feedback signals from Star Citizen's own audio: it captures the Windows render endpoint with WASAPI loopback and runs lightweight DSP (band energy + spectral-flux onset detection) to produce engine rumble, atmosphere, and impact/weapon transients. This needs no D-BOX software, touches neither `StarCitizen.exe` nor any anti-cheat surface, and ships as a single self-contained `.exe`. The trade-off is that audio cannot carry true motion data (G-force, attitude) or discrete state (gear, decouple), so those effects are not produced from this source.
+
+The app also retains a D-BOX HaptiSync discovery path and a configurable JSON telemetry URL for any official/public channel CIG exposes later. The deeper goal of intercepting Star Citizen's native D-BOX telemetry (for true motion data) is a parked research thread documented in `docs/dbox-handoff.md` — it needs access to real D-BOX hardware to finish.
 
 ## Current Status
 
@@ -32,7 +36,8 @@ Run-Auto.cmd
 
 Launchers:
 
-- `Run-Auto.cmd` - recommended; D-BOX/API telemetry discovery with DirectInput AB6 output
+- `Run-Auto.cmd` - recommended; audio-DSP telemetry with DirectInput AB6 output
+- `Run-Audio.cmd` - force the audio-DSP telemetry path with DirectInput output
 - `Run-DirectInput.cmd` - force Windows DirectInput output
 - `Run-DBoxTelemetry.cmd` - force D-BOX HaptiSync telemetry discovery mode
 - `Run-Preview.cmd` - no hardware output
@@ -51,10 +56,34 @@ Supported modes:
 
 ```text
 Auto
+AudioDsp
 DBoxHaptiSync
 OfficialHttp
 Preview
 ```
+
+`Auto` resolves to `AudioDsp` (unless a telemetry URL is configured, in which case it uses the HTTP source).
+
+### Audio DSP (default)
+
+```text
+MOZA_SC_TELEMETRY=AudioDsp
+```
+
+Captures the default render device via WASAPI loopback and maps the audio to engine rumble, atmosphere, and impact/weapon transients. Optional environment variables:
+
+```text
+MOZA_SC_AUDIO_GAIN=1.0      # input sensitivity multiplier; raise/lower to calibrate
+MOZA_SC_AUDIO_DEVICE=       # substring of a render device name; default = default device
+MOZA_SC_CONTEXT_GATE=1      # default on: only drive FFB when SC is in active flight; 0/off to disable
+MOZA_SC_GAMELOG=            # path to SC Game.log; auto-detected if blank
+```
+
+The context gate suppresses force feedback when Star Citizen is at the menu, on foot, or closed (so menu music can't cause phantom rumble), and re-enables it when you're flying. It fails open — if it can't tell, it leaves feedback on.
+
+Calibration: click `Refresh` in the app while Star Citizen is making noise. The diagnostics show the live engine/air levels in dB and the impact/weapon flux ratios, plus the latest derived signal values. Adjust `MOZA_SC_AUDIO_GAIN` until engine rumble sits near the top of its range under thrust without pegging at idle.
+
+Limitations: because the signal is a single mixed audio stream, loud broadband sounds can cross-trigger (e.g., sustained gunfire nudges the atmosphere channel; an explosion fires both impact and weapon). The capture is the whole system mix, so other loud audio (music, Discord) also feeds it — keep those quiet, or point `MOZA_SC_AUDIO_DEVICE` at a render device used only by the game.
 
 To test a future official/public JSON telemetry endpoint:
 

@@ -100,12 +100,21 @@ public sealed class DirectInputForceFeedbackDevice : IForceFeedbackDevice
         EnsureInitialized();
 
         var key = effect.StateKey ?? $"transient-{Guid.NewGuid():N}";
-        StopEffect(key);
 
+        bool alreadyRunning;
+        lock (_sync)
+        {
+            alreadyRunning = _activeEffects.ContainsKey(key);
+        }
+
+        // One DirectInput effect per logical state (engine, atmosphere, impact,
+        // ...), updated in place. Creating a fresh effect every telemetry frame
+        // (the old behaviour) leaked downloaded effects until the device ran out
+        // of slots and CreateEffect faulted natively.
         var directInputEffect = GetOrCreateEffect(effect);
 
-        AppLog.Write($"DirectInput starting effect '{effect.Name}' on '{_productName}' intensity={effect.Intensity:0.###} durationMs={effect.Duration.TotalMilliseconds:0} frequencyHz={effect.FrequencyHz:0.###}.");
-        StartEffect(directInputEffect, effect.Name);
+        AppLog.Write($"DirectInput effect '{effect.Name}' on '{_productName}' intensity={effect.Intensity:0.###} durationMs={effect.Duration.TotalMilliseconds:0} frequencyHz={effect.FrequencyHz:0.###}.");
+        ApplyParameters(directInputEffect, effect, start: !alreadyRunning);
 
         lock (_sync)
         {
@@ -131,12 +140,7 @@ public sealed class DirectInputForceFeedbackDevice : IForceFeedbackDevice
             }
         }
 
-        var createdEffect = effect.Kind switch
-        {
-            ForceEffectKind.Bump or ForceEffectKind.ConstantForce => CreateBumpEffect(effect),
-            ForceEffectKind.PeriodicVibration or ForceEffectKind.StateVibration => CreatePeriodicEffect(effect),
-            _ => CreatePeriodicEffect(effect)
-        };
+        var createdEffect = CreateEffect(effect);
 
         lock (_sync)
         {
@@ -150,22 +154,6 @@ public sealed class DirectInputForceFeedbackDevice : IForceFeedbackDevice
         }
 
         return createdEffect;
-    }
-
-    private IDirectInputEffect CreateBumpEffect(ForceEffect effect)
-    {
-        try
-        {
-            return CreateConstantEffect(effect);
-        }
-        catch (Exception ex)
-        {
-            AppLog.Write(ex, $"DirectInput constant-force bump creation failed for '{effect.Name}'. Falling back to a short sine pulse.");
-            return CreatePeriodicEffect(effect with
-            {
-                FrequencyHz = effect.FrequencyHz <= 0 ? 42 : effect.FrequencyHz
-            });
-        }
     }
 
     public Task StopAsync(string stateKey, CancellationToken cancellationToken)
@@ -195,44 +183,42 @@ public sealed class DirectInputForceFeedbackDevice : IForceFeedbackDevice
         return Task.CompletedTask;
     }
 
-    private IDirectInputEffect CreatePeriodicEffect(ForceEffect effect)
+    private IDirectInputEffect CreateEffect(ForceEffect effect)
     {
-        var periodic = new DirectInputPeriodic
+        var asConstant = effect.Kind is ForceEffectKind.Bump or ForceEffectKind.ConstantForce;
+        try
         {
-            Magnitude = ScaleMagnitude(effect.Intensity),
-            Offset = 0,
-            Phase = 0,
-            Period = HertzToPeriod(effect.FrequencyHz)
-        };
-
-        return CreateEffect(
-            DirectInputConstants.GuidSine,
-            effect,
-            Marshal.SizeOf<DirectInputPeriodic>(),
-            pointer => Marshal.StructureToPtr(periodic, pointer, false));
+            return BuildOrUpdate(effect, asConstant, existing: null, start: false);
+        }
+        catch (Exception ex) when (asConstant)
+        {
+            AppLog.Write(ex, $"DirectInput constant-force creation failed for '{effect.Name}'. Falling back to a sine pulse.");
+            return BuildOrUpdate(
+                effect with { FrequencyHz = effect.FrequencyHz <= 0 ? 42 : effect.FrequencyHz },
+                asConstant: false,
+                existing: null,
+                start: false);
+        }
     }
 
-    private IDirectInputEffect CreateConstantEffect(ForceEffect effect)
+    private void ApplyParameters(IDirectInputEffect directInputEffect, ForceEffect effect, bool start)
     {
-        var constant = new DirectInputConstantForce
-        {
-            Magnitude = ScaleSignedMagnitude(effect.Intensity)
-        };
-
-        return CreateEffect(
-            DirectInputConstants.GuidConstantForce,
-            effect,
-            Marshal.SizeOf<DirectInputConstantForce>(),
-            pointer => Marshal.StructureToPtr(constant, pointer, false));
+        var asConstant = effect.Kind is ForceEffectKind.Bump or ForceEffectKind.ConstantForce;
+        _ = BuildOrUpdate(effect, asConstant, existing: directInputEffect, start);
     }
 
-    private IDirectInputEffect CreateEffect(
-        Guid effectGuid,
-        ForceEffect effect,
-        int typeSpecificSize,
-        Action<IntPtr> writeTypeSpecificParameters)
+    // Builds the DIEFFECT (+ type-specific params) for a spec and either creates
+    // a new device effect (existing == null) or updates an existing one in place
+    // via SetParameters. Reusing one effect per logical state and updating it is
+    // what keeps the downloaded-effect count bounded instead of leaking until the
+    // device overruns and CreateEffect faults.
+    private IDirectInputEffect BuildOrUpdate(ForceEffect effect, bool asConstant, IDirectInputEffect? existing, bool start)
     {
         EnsureInitialized();
+
+        var typeSpecificSize = asConstant
+            ? Marshal.SizeOf<DirectInputConstantForce>()
+            : Marshal.SizeOf<DirectInputPeriodic>();
 
         var axes = IntPtr.Zero;
         var direction = IntPtr.Zero;
@@ -248,9 +234,29 @@ public sealed class DirectInputForceFeedbackDevice : IForceFeedbackDevice
             Marshal.WriteInt32(axes, sizeof(int), DirectInputConstants.DijoFsY);
             Marshal.WriteInt32(direction, 0, 1);
             Marshal.WriteInt32(direction, sizeof(int), 1);
-            writeTypeSpecificParameters(typeSpecific);
 
-            var directInputEffect = new DirectInputEffect
+            if (asConstant)
+            {
+                Marshal.StructureToPtr(
+                    new DirectInputConstantForce { Magnitude = ScaleSignedMagnitude(effect.Intensity) },
+                    typeSpecific,
+                    false);
+            }
+            else
+            {
+                Marshal.StructureToPtr(
+                    new DirectInputPeriodic
+                    {
+                        Magnitude = ScaleMagnitude(effect.Intensity),
+                        Offset = 0,
+                        Phase = 0,
+                        Period = HertzToPeriod(effect.FrequencyHz)
+                    },
+                    typeSpecific,
+                    false);
+            }
+
+            var dieffect = new DirectInputEffect
             {
                 Size = Marshal.SizeOf<DirectInputEffect>(),
                 Flags = DirectInputConstants.DieffCartesian | DirectInputConstants.DieffObjectOffsets,
@@ -268,17 +274,47 @@ public sealed class DirectInputForceFeedbackDevice : IForceFeedbackDevice
                 StartDelay = 0
             };
 
-            var result = _device!.CreateEffect(ref effectGuid, ref directInputEffect, out var createdEffect, IntPtr.Zero);
-            if (result == DirectInputConstants.DierrNotExclusiveAcquired)
+            if (existing is null)
             {
-                AppLog.Write($"DirectInput lost exclusive acquisition for '{_productName}' while creating '{effect.Name}'. Re-acquiring and retrying once.");
-                Reacquire();
-                result = _device.CreateEffect(ref effectGuid, ref directInputEffect, out createdEffect, IntPtr.Zero);
+                var guid = asConstant ? DirectInputConstants.GuidConstantForce : DirectInputConstants.GuidSine;
+                var createResult = _device!.CreateEffect(ref guid, ref dieffect, out var created, IntPtr.Zero);
+                if (createResult == DirectInputConstants.DierrNotExclusiveAcquired)
+                {
+                    Reacquire();
+                    createResult = _device.CreateEffect(ref guid, ref dieffect, out created, IntPtr.Zero);
+                }
+
+                DirectInputNative.ThrowIfFailed(createResult, $"DirectInput could not create '{effect.Name}'");
+                DownloadEffect(created, effect.Name);
+                return created;
             }
 
-            DirectInputNative.ThrowIfFailed(result, $"DirectInput could not create '{effect.Name}'");
-            DownloadEffect(createdEffect, effect.Name);
-            return createdEffect;
+            // Only the mutable parameters may be changed via SetParameters.
+            // DIEP_AXES (and direction) are fixed at creation — including DIEP_AXES
+            // here makes the driver reject the update with ERROR_ALREADY_INITIALIZED
+            // (0x800704DF). Update magnitude/period (type-specific), gain and duration.
+            var flags = DirectInputConstants.DiepTypespecificparams
+                | DirectInputConstants.DiepGain
+                | DirectInputConstants.DiepDuration;
+            if (start)
+            {
+                flags |= DirectInputConstants.DiepStart;
+            }
+
+            var result = existing.SetParameters(ref dieffect, flags);
+            if (result == DirectInputConstants.DierrNotExclusiveAcquired)
+            {
+                Reacquire();
+                result = existing.SetParameters(ref dieffect, flags);
+            }
+            else if (result == DirectInputConstants.DierrNotDownloaded)
+            {
+                DownloadEffect(existing, effect.Name);
+                result = existing.SetParameters(ref dieffect, flags);
+            }
+
+            DirectInputNative.ThrowIfFailed(result, $"DirectInput could not update '{effect.Name}'");
+            return existing;
         }
         finally
         {
@@ -334,33 +370,6 @@ public sealed class DirectInputForceFeedbackDevice : IForceFeedbackDevice
         }
 
         _ = _device.SendForceFeedbackCommand(DirectInputConstants.DisffcSetActuatorsOn);
-    }
-
-    private void StartEffect(IDirectInputEffect effect, string effectName)
-    {
-        DownloadEffect(effect, effectName);
-
-        var startResult = effect.Start(1, 0);
-        if (startResult == DirectInputConstants.DierrNotDownloaded)
-        {
-            AppLog.Write($"DirectInput effect '{effectName}' was not downloaded. Downloading and retrying start once.");
-            DownloadEffect(effect, effectName);
-            startResult = effect.Start(1, 0);
-        }
-        else if (startResult == DirectInputConstants.DierrNotExclusiveAcquired)
-        {
-            AppLog.Write($"DirectInput lost exclusive acquisition for '{_productName}' while starting '{effectName}'. Re-acquiring and retrying once.");
-            Reacquire();
-            DownloadEffect(effect, effectName);
-            startResult = effect.Start(1, 0);
-        }
-        else if (startResult == DirectInputConstants.DierrEffectPlaying)
-        {
-            _ = effect.Stop();
-            startResult = effect.Start(1, 0);
-        }
-
-        DirectInputNative.ThrowIfFailed(startResult, $"DirectInput could not start '{effectName}'");
     }
 
     private void DownloadEffect(IDirectInputEffect effect, string effectName)
@@ -420,15 +429,12 @@ public sealed class DirectInputForceFeedbackDevice : IForceFeedbackDevice
         return (int)Math.Clamp(duration.TotalMilliseconds * 1000, 1, int.MaxValue);
     }
 
+    // One cached device effect per logical effect. Intensity/frequency/duration
+    // are NOT part of the key — they're updated in place on the cached effect via
+    // SetParameters, so the device holds only a handful of effects rather than a
+    // new one per telemetry frame.
     private static string GetCacheKey(ForceEffect effect) =>
-        string.Join(
-            '|',
-            effect.Kind,
-            effect.Name,
-            Math.Round(Math.Clamp(effect.Intensity, 0, 1), 3),
-            (int)Math.Clamp(effect.Duration.TotalMilliseconds, 0, int.MaxValue),
-            Math.Round(effect.FrequencyHz, 3),
-            effect.StateKey ?? string.Empty);
+        string.Join('|', effect.Kind, effect.Name, effect.StateKey ?? string.Empty);
 
     private static void ReleaseEffect(IDirectInputEffect effect)
     {

@@ -309,6 +309,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             }
 
             Diagnostics.Add("Extended diagnostics timed out.");
+            PersistDiagnostics();
             Status = "Diagnostics timed out.";
             return;
         }
@@ -323,8 +324,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             Diagnostics.Add(line);
         }
 
+        PersistDiagnostics();
         Status = "Diagnostics refreshed.";
         OnPropertyChanged(nameof(TelemetryStatus));
+    }
+
+    private void PersistDiagnostics()
+    {
+        AppLog.WriteDiagnostics(Diagnostics);
+        Diagnostics.Add($"Saved to: {AppLog.DiagnosticsPath}");
     }
 
     private void RefreshDiagnostics(bool includeExtendedDiagnostics)

@@ -54,6 +54,7 @@ function Write-Launcher {
 }
 
 Write-Launcher "Run-Auto.cmd" ""
+Write-Launcher "Run-Audio.cmd" "DirectInput" @("MOZA_SC_TELEMETRY=AudioDsp")
 Write-Launcher "Run-DirectInput.cmd" "DirectInput"
 Write-Launcher "Run-Preview.cmd" "Preview"
 Write-Launcher "Run-DBoxTelemetry.cmd" "DirectInput" @("MOZA_SC_TELEMETRY=DBoxHaptiSync")

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MozaStarCitizen.AudioTune</RootNamespace>
+    <AssemblyName>AudioTune</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Share the exact production analyzer so offline tuning matches the live path 1:1. -->
+    <Compile Include="..\..\src\MozaStarCitizen.App\Telemetry\Audio\AudioTelemetryAnalyzer.cs"
+             Link="AudioTelemetryAnalyzer.cs" />
+    <Compile Include="..\..\src\MozaStarCitizen.App\Telemetry\Audio\ProcessLoopbackCapture.cs"
+             Link="ProcessLoopbackCapture.cs" />
+  </ItemGroup>
+
+</Project>
