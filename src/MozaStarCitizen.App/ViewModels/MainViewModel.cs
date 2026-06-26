@@ -29,9 +29,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         StartCommand = new RelayCommand(_ => StartAsync(), _ => !IsMonitoring && !_isStarting);
         StopCommand = new RelayCommand(_ => StopAsync(), _ => IsMonitoring);
         StopEffectsCommand = new RelayCommand(_ => StopEffectsAsync());
-        TestEngineCommand = new RelayCommand(_ => TestAsync(TestTelemetrySignal.Engine));
-        TestImpactCommand = new RelayCommand(_ => TestAsync(TestTelemetrySignal.Impact));
-        TestBoostCommand = new RelayCommand(_ => TestAsync(TestTelemetrySignal.Boost));
+        TestAfterburnerCommand = new RelayCommand(_ => TestAsync(TestTelemetrySignal.Afterburner));
+        TestAtmosphereCommand = new RelayCommand(_ => TestAsync(TestTelemetrySignal.Atmosphere));
         RefreshDiagnosticsCommand = new RelayCommand(_ => RefreshDiagnosticsAsync());
 
         OutputName = _feedback.OutputName;
@@ -78,11 +77,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public ICommand StopEffectsCommand { get; }
 
-    public ICommand TestEngineCommand { get; }
+    public ICommand TestAfterburnerCommand { get; }
 
-    public ICommand TestImpactCommand { get; }
-
-    public ICommand TestBoostCommand { get; }
+    public ICommand TestAtmosphereCommand { get; }
 
     public ICommand RefreshDiagnosticsCommand { get; }
 
@@ -194,7 +191,24 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                     Interlocked.Increment(ref _framesWithSignals);
                 }
 
-                var result = await _feedback.HandleTelemetryAsync(frame, cancellationToken);
+                string result;
+                try
+                {
+                    result = await _feedback.HandleTelemetryAsync(frame, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    // A single frame's force update failing (e.g. the stick was
+                    // power-cycled) must not tear down the whole monitor — log and
+                    // keep consuming telemetry so output resumes when it recovers.
+                    AppLog.Write(ex, "Force-feedback update failed for a frame; continuing");
+                    continue;
+                }
+
                 if (!result.Contains("no force update", StringComparison.OrdinalIgnoreCase))
                 {
                     Interlocked.Increment(ref _forceUpdates);
@@ -204,6 +218,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
                 if (frames <= 5 || frames % 120 == 0)
                 {
+                    // Periodic telemetry snapshot to the log so flight behaviour can
+                    // be diagnosed without clicking Refresh (which unfocuses SC and
+                    // skews the reading). Shows the gate state + live audio levels.
+                    AppLog.Write($"TELEMETRY: {_telemetry.Status}");
                     Dispatch(() =>
                     {
                         Status = BuildMonitoringStatus();
@@ -242,24 +260,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         var frame = signal switch
         {
-            TestTelemetrySignal.Engine => new StarCitizenTelemetryFrame
+            TestTelemetrySignal.Afterburner => new StarCitizenTelemetryFrame
             {
                 Source = "Manual test",
-                EngineRumble = 0.42,
-                EngineFrequencyHz = 32,
-                GForceLongitudinal = 0.15
+                Afterburner = 1.0
             },
-            TestTelemetrySignal.Impact => new StarCitizenTelemetryFrame
+            TestTelemetrySignal.Atmosphere => new StarCitizenTelemetryFrame
             {
                 Source = "Manual test",
-                Impact = 0.85
-            },
-            TestTelemetrySignal.Boost => new StarCitizenTelemetryFrame
-            {
-                Source = "Manual test",
-                Boost = 0.9,
-                EngineRumble = 0.55,
-                EngineFrequencyHz = 44
+                Atmosphere = 0.8
             },
             _ => new StarCitizenTelemetryFrame { Source = "Manual test" }
         };
@@ -406,8 +415,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private enum TestTelemetrySignal
     {
-        Engine,
-        Impact,
-        Boost
+        Afterburner,
+        Atmosphere
     }
 }

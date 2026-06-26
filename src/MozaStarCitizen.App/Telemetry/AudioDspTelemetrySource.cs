@@ -47,6 +47,7 @@ public sealed class AudioDspTelemetrySource : IStarCitizenTelemetrySource
     private double _peakAtmosphere;
     private double _peakImpact;
     private double _peakWeapon;
+    private double _peakAfterburner;
     private double _peakEngineDb = double.NegativeInfinity;
     private double _peakAirDb = double.NegativeInfinity;
 
@@ -244,14 +245,14 @@ public sealed class AudioDspTelemetrySource : IStarCitizenTelemetrySource
                 $"flux ratios impact {analyzer.LastImpactRatio:0.0}, weapon {analyzer.LastWeaponRatio:0.0}");
             lines.Add(
                 $"Last signals: engine {_lastFeatures.EngineRumble:0.00} @ {_lastFeatures.EngineFrequencyHz:0} Hz, " +
-                $"atmo {_lastFeatures.Atmosphere:0.00}, boost {_lastFeatures.Boost:0.00}, " +
+                $"atmo {_lastFeatures.Atmosphere:0.00}, afterburner {_lastFeatures.Afterburner:0.00}, " +
                 $"impact {_lastFeatures.Impact:0.00}, weapon {_lastFeatures.WeaponFire:0.00}");
         }
 
         lines.Add(
             $"Session peaks: engine {_peakEngine:0.00} ({FormatDb(_peakEngineDb)}), " +
             $"atmo {_peakAtmosphere:0.00} ({FormatDb(_peakAirDb)}), " +
-            $"impact {_peakImpact:0.00}, weapon {_peakWeapon:0.00}");
+            $"afterburner {_peakAfterburner:0.00}, impact {_peakImpact:0.00}, weapon {_peakWeapon:0.00}");
         lines.Add($"Calibration: {CalibrationHint()}");
         lines.Add("Note: audio cannot provide G-force, attitude, gear, or decouple state.");
         return Task.FromResult<IReadOnlyList<string>>(lines);
@@ -288,6 +289,7 @@ public sealed class AudioDspTelemetrySource : IStarCitizenTelemetrySource
         _peakAtmosphere = Math.Max(_peakAtmosphere, features.Atmosphere);
         _peakImpact = Math.Max(_peakImpact, features.Impact);
         _peakWeapon = Math.Max(_peakWeapon, features.WeaponFire);
+        _peakAfterburner = Math.Max(_peakAfterburner, features.Afterburner);
 
         var stats = _analyzer;
         if (stats is not null)
@@ -325,7 +327,7 @@ public sealed class AudioDspTelemetrySource : IStarCitizenTelemetrySource
             _status =
                 $"Capturing \"{_deviceName}\": engine {features.EngineRumble:0.00} " +
                 $"({FormatDb(analyzer.LastEngineDb)}), atmo {features.Atmosphere:0.00}, " +
-                $"boost {features.Boost:0.00}.";
+                $"afterburner {features.Afterburner:0.00}.";
         }
     }
 
@@ -465,6 +467,7 @@ public sealed class AudioDspTelemetrySource : IStarCitizenTelemetrySource
         _peakAtmosphere = 0;
         _peakImpact = 0;
         _peakWeapon = 0;
+        _peakAfterburner = 0;
         _peakEngineDb = double.NegativeInfinity;
         _peakAirDb = double.NegativeInfinity;
     }

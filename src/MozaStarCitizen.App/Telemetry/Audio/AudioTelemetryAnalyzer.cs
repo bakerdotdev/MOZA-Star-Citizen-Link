@@ -44,7 +44,9 @@ public sealed class AudioTelemetryAnalyzer
     // trip it; flying at high sustained output does. Surfaces as a rumble surge.
     private const double AfterburnerOnEnv = 0.72;
     private const double AfterburnerOffEnv = 0.58;     // hysteresis
-    private const int AfterburnerSustainWindows = 36;  // ~0.8 s of sustained high output before it engages
+    private const int AfterburnerSustainWindows = 8;   // ~0.17 s of sustained high output before it engages
+                                                       // (long enough to reject a 1-2 window blip, short enough
+                                                       // that the rumble doesn't lag noticeably behind the throttle)
 
     // Atmosphere = air rush: broadband NOISE in the low-mids. Measured ~ -66 dB
     // in atmospheric flight vs ~ -78 dB in vacuum over this band (the old
@@ -206,7 +208,10 @@ public sealed class AudioTelemetryAnalyzer
         }
 
         var afterburnerTarget = _afterburnerSustain >= AfterburnerSustainWindows ? 1.0 : 0.0;
-        _afterburnerEnv = Lerp(_afterburnerEnv, afterburnerTarget, afterburnerTarget > _afterburnerEnv ? 0.06 : 0.04);
+        // Fast attack, fairly fast release: rumble swells in within ~2-3 windows of
+        // engaging and falls away within ~0.1-0.2 s of the throttle dropping, so it
+        // tracks the afterburner instead of lagging and lingering.
+        _afterburnerEnv = Lerp(_afterburnerEnv, afterburnerTarget, afterburnerTarget > _afterburnerEnv ? 0.30 : 0.18);
 
         // --- Atmosphere (air rush): band energy gated by spectral flatness ---
         var airDb = ToDb(BandRms(AirLoHz, AirHiHz));

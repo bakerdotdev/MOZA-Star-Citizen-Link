@@ -63,9 +63,8 @@
                 <Button Content="Stop Effects" Command="{Binding StopEffectsCommand}" MinWidth="104" />
             </StackPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <Button Content="Test Engine" Command="{Binding TestEngineCommand}" MinWidth="104" Margin="0,0,8,0" />
-                <Button Content="Test Impact" Command="{Binding TestImpactCommand}" MinWidth="104" Margin="0,0,8,0" />
-                <Button Content="Test Boost" Command="{Binding TestBoostCommand}" MinWidth="96" />
+                <Button Content="Test Afterburner" Command="{Binding TestAfterburnerCommand}" MinWidth="120" Margin="0,0,8,0" />
+                <Button Content="Test Atmosphere" Command="{Binding TestAtmosphereCommand}" MinWidth="120" />
             </StackPanel>
         </DockPanel>
 

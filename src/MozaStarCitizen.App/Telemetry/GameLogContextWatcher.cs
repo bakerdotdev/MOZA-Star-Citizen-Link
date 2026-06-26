@@ -27,9 +27,9 @@ public sealed class GameLogContextWatcher : IAsyncDisposable
     private CancellationTokenSource? _cts;
     private Task? _loop;
     private long _pos;
-    private bool _vehicleActive;
+    private bool _atMenu;
     private bool _shutdown;
-    private string _mode = "INVALID";
+    private string _mode = "(unknown)";
     private volatile bool _scRunning;
     private string _status = "Not started.";
 
@@ -48,8 +48,15 @@ public sealed class GameLogContextWatcher : IAsyncDisposable
             if (_logPath is null) return true;   // no log -> fail open (allow whenever SC runs)
             lock (_sync)
             {
-                if (_shutdown) return false;
-                return _vehicleActive;           // a vehicle is spawned and we haven't returned to menu
+                // Fail open. Current SC builds emit no stable "entered pilot seat"
+                // marker (only a ClearDriver on exit), so requiring a positive
+                // vehicle-spawn event made the gate stick CLOSED for the whole
+                // flight. Instead, allow feedback whenever SC is running and only
+                // suppress on high-confidence not-flying states (shutdown, or a
+                // confirmed return to the menu on builds that still log it). Fine
+                // gating — on foot, in menus — is handled by the engine-presence
+                // and focus gates in ContextGatedTelemetrySource.
+                return !_shutdown && !_atMenu;
             }
         }
     }
@@ -74,7 +81,7 @@ public sealed class GameLogContextWatcher : IAsyncDisposable
                 _scRunning = Process.GetProcessesByName("StarCitizen").Length > 0;
                 if (!_scRunning)
                 {
-                    lock (_sync) { _vehicleActive = false; _shutdown = false; }
+                    lock (_sync) { _atMenu = false; _shutdown = false; }
                 }
                 else if (_logPath is not null)
                 {
@@ -99,7 +106,7 @@ public sealed class GameLogContextWatcher : IAsyncDisposable
         {
             // Log was truncated/replaced -> new SC session.
             _pos = 0;
-            lock (_sync) { _vehicleActive = false; _shutdown = false; _mode = "INVALID"; }
+            lock (_sync) { _atMenu = false; _shutdown = false; _mode = "(unknown)"; }
         }
 
         using var fs = new FileStream(_logPath!, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
@@ -121,25 +128,26 @@ public sealed class GameLogContextWatcher : IAsyncDisposable
             if (line.Contains("FastShutdown", StringComparison.Ordinal))
             {
                 _shutdown = true;
-                _vehicleActive = false;
                 return;
             }
 
+            // Old-format master-mode marker. Kept as a refinement: on builds that
+            // still log it, INVALID/-1 means the frontend menu (suppress); a real
+            // mode means we left the menu. Absent in current builds, which is fine
+            // because the gate fails open.
             var m = ModeRegex.Match(line);
             if (m.Success)
             {
                 _mode = m.Groups[1].Value;
                 _shutdown = false;
-                if (_mode == "INVALID" || m.Groups[2].Value == "-1")
-                {
-                    _vehicleActive = false; // returned to menu / no active mode
-                }
+                _atMenu = _mode == "INVALID" || m.Groups[2].Value == "-1";
                 return;
             }
 
-            if (VehicleSpawn.IsMatch(line))
+            // A vehicle spawn or in-game client spawn confirms we're past the menu.
+            if (VehicleSpawn.IsMatch(line) || line.Contains("OnClientSpawned", StringComparison.Ordinal))
             {
-                _vehicleActive = true;
+                _atMenu = false;
                 _shutdown = false;
             }
         }
@@ -152,7 +160,7 @@ public sealed class GameLogContextWatcher : IAsyncDisposable
             return
             [
                 $"Context gate source: {_logPath ?? "(SC-running only)"}",
-                $"SC running: {_scRunning}; mode: {_mode}; vehicle active: {_vehicleActive}; shutdown: {_shutdown}",
+                $"SC running: {_scRunning}; mode: {_mode}; at menu: {_atMenu}; shutdown: {_shutdown} (gate fails open; fine gating via engine+focus)",
                 $"In-flight (FFB enabled): {InFlight}"
             ];
         }
