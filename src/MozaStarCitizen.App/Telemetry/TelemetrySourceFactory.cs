@@ -1,3 +1,6 @@
+using System.Globalization;
+using MozaStarCitizen.App.Telemetry.DBoxSdkLog;
+
 namespace MozaStarCitizen.App.Telemetry;
 
 public static class TelemetrySourceFactory
@@ -8,6 +11,9 @@ public static class TelemetrySourceFactory
         var configuredUrl =
             Environment.GetEnvironmentVariable("MOZA_SC_TELEMETRY_URL") ??
             Environment.GetEnvironmentVariable("MOZA_SC_OFFICIAL_TELEMETRY_URL");
+        var configuredDBoxLog = FirstNonBlank(
+            Environment.GetEnvironmentVariable("MOZA_SC_DBOX_XML_LOG"),
+            Environment.GetEnvironmentVariable("MOZA_SC_DBOX_LOG"));
 
         IStarCitizenTelemetrySource source = mode switch
         {
@@ -17,6 +23,12 @@ public static class TelemetrySourceFactory
                 new NoTelemetrySource(),
             TelemetrySourceMode.DBoxHaptiSync =>
                 new DBoxHaptiSyncTelemetrySource(),
+            TelemetrySourceMode.DBoxSdkSampleLog when !string.IsNullOrWhiteSpace(configuredDBoxLog) =>
+                new DBoxSdkSampleLogTelemetrySource(
+                    configuredDBoxLog,
+                    ParseReplaySpeed(Environment.GetEnvironmentVariable("MOZA_SC_DBOX_REPLAY_SPEED"))),
+            TelemetrySourceMode.DBoxSdkSampleLog =>
+                new NoTelemetrySource(),
             TelemetrySourceMode.AudioDsp =>
                 new AudioDspTelemetrySource(),
             TelemetrySourceMode.Preview =>
@@ -52,6 +64,16 @@ public static class TelemetrySourceFactory
         string.Equals(value, "0", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(value, "off", StringComparison.OrdinalIgnoreCase);
 
+    private static double ParseReplaySpeed(string? value) =>
+        double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var speed) &&
+        double.IsFinite(speed) &&
+        speed is >= 0 and <= 100
+            ? speed
+            : 1;
+
+    private static string? FirstNonBlank(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
     private static TelemetrySourceMode ParseMode(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -70,6 +92,7 @@ public enum TelemetrySourceMode
     Auto,
     AudioDsp,
     DBoxHaptiSync,
+    DBoxSdkSampleLog,
     OfficialHttp,
     Preview
 }

@@ -20,14 +20,21 @@ public sealed class ContextGatedTelemetrySource : IStarCitizenTelemetrySource
     // Slow average of engine rumble (~1 s time constant at the audio frame rate),
     // so only a SUSTAINED engine drone — not a transient low-frequency spike from
     // gunfire/footsteps — keeps the gate open.
-    private const double EnginePresenceRate = 0.02;
-    private const double EnginePresenceThreshold = 0.2;
+    // Engine-presence gate: suppress feedback when there's no sustained engine
+    // drone (on foot / in a hangar). The threshold is deliberately LOW with
+    // hysteresis — a high absolute level can't work because quieter ships never
+    // clear it (the gate would mute them entirely), and a tight threshold
+    // flickers mid-flight as the engine dips, cutting the rumble out.
+    private const double EnginePresenceRate = 0.03;
+    private const double EngineOnThreshold = 0.08;
+    private const double EngineOffThreshold = 0.03;
 
     private readonly IStarCitizenTelemetrySource _inner;
     private readonly GameLogContextWatcher _context;
     private readonly ForegroundWatcher? _foreground;
     private readonly bool _engineGate;
     private double _enginePresence;
+    private bool _enginePresent;
 
     public ContextGatedTelemetrySource(
         IStarCitizenTelemetrySource inner,
@@ -47,7 +54,7 @@ public sealed class ContextGatedTelemetrySource : IStarCitizenTelemetrySource
         ? _inner.Status
         : $"[gated: {GateReason}] {_inner.Status}";
 
-    private bool EnginePresent => !_engineGate || _enginePresence > EnginePresenceThreshold;
+    private bool EnginePresent => !_engineGate || _enginePresent;
 
     private bool Active => _context.InFlight && (_foreground?.IsFocused ?? true) && EnginePresent;
 
@@ -73,6 +80,8 @@ public sealed class ContextGatedTelemetrySource : IStarCitizenTelemetrySource
             if (_engineGate)
             {
                 _enginePresence += (frame.EngineRumble - _enginePresence) * EnginePresenceRate;
+                if (_enginePresence >= EngineOnThreshold) _enginePresent = true;
+                else if (_enginePresence <= EngineOffThreshold) _enginePresent = false;
             }
 
             yield return Active
@@ -92,7 +101,7 @@ public sealed class ContextGatedTelemetrySource : IStarCitizenTelemetrySource
 
         if (_engineGate)
         {
-            gate.Add($"Engine presence: {_enginePresence:0.00} (gate {(EnginePresent ? "open" : "closed")} at {EnginePresenceThreshold:0.00})");
+            gate.Add($"Engine presence: {_enginePresence:0.00} (gate {(EnginePresent ? "open" : "closed")}; on>={EngineOnThreshold:0.00}/off<={EngineOffThreshold:0.00})");
         }
 
         return [.. gate, .. innerDiagnostics];

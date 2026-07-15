@@ -19,7 +19,7 @@ Pipeline:
    - **Boost** — a conservative detector: sustained engine loudness well above its slow baseline.
 4. Each window is emitted as a `StarCitizenTelemetryFrame` over a bounded `Channel` (drop-oldest) so the audio thread never blocks.
 
-What it cannot provide: G-force/attitude, landing gear, countermeasure, and decouple state are not recoverable from audio and are left unset. Those would come from the optional `Game.log` augmentation or from the D-BOX coded-telemetry path (see `dbox-telemetry-research.md`).
+What it cannot provide: G-force/attitude, landing gear, countermeasure, and decouple state are not recoverable from audio and are left unset. Accurate values require a supported semantic telemetry interface.
 
 Known cross-talk: a single mixed stream means loud broadband sounds bleed across channels (sustained gunfire raises atmosphere; explosions fire both impact and weapon; the onset of engine rumble fires a one-shot impact). The `ForceFeedbackController` debounce windows absorb most of this. Tightening it further requires tuning against real game audio, not synthetic tones.
 
@@ -39,44 +39,60 @@ It probes common Swagger/OpenAPI JSON locations and scans available paths for te
 
 No process injection, memory reading, or packet interception is used.
 
-## D-BOX Discovery Runs
+`DBoxHaptiSync` is a legacy, explicit discovery mode for HaptiSync's documented
+local HTTP surface. It is not selected by `Auto` and is not used by the SDK
+sample-log workflow below.
 
-Use the discovery script when testing whether a newer Star Citizen or D-BOX build exposes a usable local telemetry path.
+## D-BOX SDK sample-log replay
 
-For the most useful run, close Star Citizen first, start an elevated PowerShell, then run:
+`DBoxSdkSampleLogTelemetrySource` is an offline validation source. It reads one
+explicitly selected XML log created by the official D-BOX `SampleRacer` or
+`SampleFlyer` SDK program. It refuses all other application keys, including
+`StarCitizen`, and it never searches the SDK, game folders, ProgramData, running
+processes, services, the registry, or network endpoints.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\collect-dbox-discovery.ps1 -CaptureFirst -EnablePacketTrace -InstallPktMonPortFilters -PacketTraceSeconds 180 -SampleSeconds 60
-```
-
-If you are not already in an elevated shell, this helper opens the capture in a UAC-elevated PowerShell window:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\start-dbox-discovery-elevated.ps1
-```
-
-While the `pktmon capture active` message is visible, launch Star Citizen and trigger known haptic events: ship engine idle, boost/afterburner, landing gear, weapon fire, countermeasure, and a small landing/impact if practical.
-
-The script writes:
-
-- `artifacts\dbox-discovery-*.txt` - D-BOX API probes, process/port inventory, logs, and Monitoring Service XML replies.
-- `artifacts\dbox-discovery-*-pktmon.txt` - brief packet summary.
-- `artifacts\dbox-discovery-*-pktmon-hex.txt` - packet text with hex dumps for quick payload checks.
-- `artifacts\dbox-discovery-*-pktmon.pcapng` - full packet capture for Wireshark-style inspection.
-
-The Monitoring Service probe talks to `127.0.0.1:40001` using D-BOX's documented XML commands (`GetVersion`, `GetLayout`, `GetStatus`, `GetSoftwareParameter`). That port is expected to expose hardware/service state rather than raw Star Citizen frames, but it helps prove whether D-BOX sees a platform and whether any stream-related status changes are visible.
-
-## D-BOX Receiver Port Probe
-
-`LiveMotionConnector.config` points at `127.0.0.1:61666`, but discovery runs have not shown a listener there. To test whether the Star Citizen/D-BOX LiveMotion code attempts to connect to that configured receiver, close Star Citizen and run:
+Run the sanitized parser/mapper self-test:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\probe-dbox-receiver-port.ps1 -DurationSeconds 240
+.\tools\dbox-log-inspect\bin\Release\net8.0-windows\DBoxLogInspect.exe --self-test
 ```
 
-Launch Star Citizen while the probe is active and trigger the same haptic events. If anything connects or sends a UDP datagram to `61666`, the probe writes ASCII and hex payload previews to `artifacts\dbox-receiver-probe-*.txt`.
+Validate a selected sample log without launching the app:
 
-This probe temporarily occupies `127.0.0.1:61666`, so use it only for discovery, not normal D-BOX use.
+```powershell
+.\scripts\replay-dbox-sdk-sample-log.ps1 -LogPath "D:\path\to\dbxLive64_sample.log" -ValidateOnly
+```
+
+Replay it with Preview output:
+
+```powershell
+.\scripts\replay-dbox-sdk-sample-log.ps1 -LogPath "D:\path\to\dbxLive64_sample.log"
+```
+
+Follow one already-existing sample-format file as strict NDJSON without launching
+the app or producer:
+
+```powershell
+.\scripts\observe-dbox-sdk-sample-log.ps1 -LogPath "D:\path\to\dbxLive64_sample.log"
+```
+
+This validates the schema-aware parser and normalized frame model. It does not
+capture live Star Citizen data, and the current two-signal FFB controller does not
+turn the sample-only G/load/engine/boost/impact/gear meanings into hardware
+effects. Full instructions and mappings are in
+[`dbox-sdk-sample-replay.md`](dbox-sdk-sample-replay.md); the streaming boundary
+and why a hardware-presence spoof is not itself a telemetry source are in
+[`dbox-sdk-sample-observer.md`](dbox-sdk-sample-observer.md).
+
+## Parked anti-cheat-adjacent research
+
+Packet capture, local receiver impersonation, process/module inspection, handler
+substitution, service proxying, and production D-BOX file changes are not part of
+the supported workflow. Older scripts and research notes describing those
+experiments are retained only as historical evidence and should not be run on an
+EAC-protected installation. Live integration now depends on a sanctioned D-BOX or
+CIG interface; draft requests are in
+[`vendor-telemetry-access-request.md`](vendor-telemetry-access-request.md).
 
 ## Official HTTP
 

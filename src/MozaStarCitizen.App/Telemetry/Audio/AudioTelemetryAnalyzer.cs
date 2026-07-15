@@ -39,29 +39,26 @@ public sealed class AudioTelemetryAnalyzer
     private const double EngineFloorDb = -70;
     private const double EngineCeilDb = -30;
 
-    // Afterburner: engine held near its top for a sustained stretch. Detected as
-    // a sustained-high signal (not a level step), so a brief throttle-up doesn't
-    // trip it; flying at high sustained output does. Surfaces as a rumble surge.
-    private const double AfterburnerOnEnv = 0.72;
-    private const double AfterburnerOffEnv = 0.58;     // hysteresis
-    private const int AfterburnerSustainWindows = 8;   // ~0.17 s of sustained high output before it engages
-                                                       // (long enough to reject a 1-2 window blip, short enough
-                                                       // that the rumble doesn't lag noticeably behind the throttle)
-
-    // Atmosphere = air rush: broadband NOISE in the low-mids. Measured ~ -66 dB
-    // in atmospheric flight vs ~ -78 dB in vacuum over this band (the old
-    // 2-8 kHz band sat at -93 dB, far below any usable floor, which is why
-    // atmosphere never registered). Gated by spectral flatness so tonal engine
-    // and weapon energy in the same band don't read as air.
+    // The 300-2500 Hz "air" band carries BOTH atmospheric wind and the
+    // afterburner roar; the two are told apart below.
     private const double AirLoHz = 300;
     private const double AirHiHz = 2500;
-    // Conservative window: strong atmospheric flight measured ~ -54 dB here,
-    // loud space combat ~ -66 dB, gentle air ~ -72 dB. There's no clean
-    // separator (combat noise is even flatter than air rush, so flatness gating
-    // is useless), so we set the floor above space-combat level: only clearly
-    // strong air rush registers, at the cost of missing gentle cruising air.
-    private const double AirFloorDb = -63;
-    private const double AirCeilDb = -47;
+
+    // Afterburner vs atmospheric wind, via two VOLUME-INDEPENDENT measures (the
+    // user's absolute level swings ~20 dB between sessions, so absolute dB
+    // thresholds are useless):
+    //   * Spectral TILT = airDb - engineDb (air-band loudness RELATIVE to the
+    //     engine band). Labeled clips: quiet space cruise ~-23 dB, atmospheric
+    //     wind ~-17 dB, afterburner roar ~-12 dB. Below TiltFloor = quiet cruise
+    //     (no air signal -> silent); ramps to full by TiltCeil.
+    //   * Spectral FLATNESS of the air band: the afterburner is a broadband NOISE
+    //     roar (flat, ~0.68) while wind is comparatively tonal (~0.25). Above
+    //     AirFlatSplit -> afterburner; below -> atmospheric wind. (Cruise can be
+    //     incidentally flat, but its tilt is too low to register, so it's safe.)
+    private const double TiltFloorDb = -19.0;
+    private const double TiltCeilDb = -10.5;
+    private const double AirFlatSplit = 0.48;
+    private const double SilenceFloorDb = -90; // both bands below this = silence; don't trust the tilt ratio
 
     // Whitened-onset detection for impact (low thud) and weapon (mid-high crack).
     private const double ImpactLoHz = 40;
@@ -102,7 +99,6 @@ public sealed class AudioTelemetryAnalyzer
     private double _engineEnv;
     private double _prevEngineEnv;
     private int _engineRampWindows;
-    private int _afterburnerSustain;
     private double _afterburnerEnv;
     private double _airEnv;
 
@@ -197,30 +193,32 @@ public sealed class AudioTelemetryAnalyzer
         _engineRampWindows = (_engineEnv - _prevEngineEnv) > EngineRampDelta ? _engineRampWindows + 1 : 0;
         _prevEngineEnv = _engineEnv;
 
-        // Afterburner: engine sustained near the top (hysteresis on enter/exit).
-        if (_engineEnv >= AfterburnerOnEnv)
-        {
-            _afterburnerSustain++;
-        }
-        else if (_engineEnv < AfterburnerOffEnv)
-        {
-            _afterburnerSustain = 0;
-        }
-
-        var afterburnerTarget = _afterburnerSustain >= AfterburnerSustainWindows ? 1.0 : 0.0;
-        // Fast attack, fairly fast release: rumble swells in within ~2-3 windows of
-        // engaging and falls away within ~0.1-0.2 s of the throttle dropping, so it
-        // tracks the afterburner instead of lagging and lingering.
-        _afterburnerEnv = Lerp(_afterburnerEnv, afterburnerTarget, afterburnerTarget > _afterburnerEnv ? 0.30 : 0.18);
-
-        // --- Atmosphere (air rush): band energy gated by spectral flatness ---
+        // --- Air band: afterburner roar vs atmospheric wind ---
         var airDb = ToDb(BandRms(AirLoHz, AirHiHz));
         LastAirDb = airDb;
-        LastAirFlatness = BandFlatness(AirLoHz, AirHiHz); // diagnostic only
-        var airRaw = MapDb(airDb, AirFloorDb, AirCeilDb);
-        _airEnv = airRaw > _airEnv
-            ? Lerp(_airEnv, airRaw, 0.20)
-            : Lerp(_airEnv, airRaw, 0.05);
+        var flatness = BandFlatness(AirLoHz, AirHiHz);
+        LastAirFlatness = flatness;
+
+        // Volume-independent "air present" measure: how loud the air band is
+        // relative to the engine band. Quiet space cruise sits below TiltFloor
+        // (air far under engine) and yields nothing; wind and afterburner rise
+        // above it. Guarded so true silence doesn't produce a garbage ratio.
+        var audioPresent = engineDb > SilenceFloorDb || airDb > SilenceFloorDb;
+        var airPresence = audioPresent
+            ? Clamp01((airDb - engineDb - TiltFloorDb) / (TiltCeilDb - TiltFloorDb))
+            : 0.0;
+
+        // Flatness routes the air signal: flat broadband roar -> afterburner,
+        // tonal -> atmospheric wind. Mutually exclusive per window.
+        var isRoar = flatness > AirFlatSplit;
+        var afterburnerTarget = isRoar ? airPresence : 0.0;
+        var atmosphereTarget = isRoar ? 0.0 : airPresence;
+
+        // Afterburner: fast attack / fairly fast release so it tracks the throttle
+        // (no lag, no lingering tail). Atmosphere: a touch smoother — a sustained
+        // texture, not a surge.
+        _afterburnerEnv = Lerp(_afterburnerEnv, afterburnerTarget, afterburnerTarget > _afterburnerEnv ? 0.30 : 0.18);
+        _airEnv = Lerp(_airEnv, atmosphereTarget, atmosphereTarget > _airEnv ? 0.20 : 0.08);
 
         var (impact, weapon) = DetectOnsets();
 
@@ -230,9 +228,7 @@ public sealed class AudioTelemetryAnalyzer
             EngineRumble: _engineEnv,
             EngineFrequencyHz: engineHz,
             Atmosphere: _airEnv,
-            // Boost (a discrete kick) isn't inferred from audio — only the
-            // sustained Afterburner surge is, since afterburner and fast cruise
-            // are the same loudness and only a sustained-high signal is safe.
+            // Boost (a discrete kick) isn't inferred from audio.
             Boost: 0.0,
             Impact: impact,
             WeaponFire: weapon,

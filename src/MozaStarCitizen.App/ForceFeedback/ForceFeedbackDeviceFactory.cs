@@ -7,17 +7,15 @@ public static class ForceFeedbackDeviceFactory
         var outputMode = ParseOutputMode(Environment.GetEnvironmentVariable("MOZA_SC_OUTPUT"));
         var devices = new List<IForceFeedbackDevice>();
 
-        var directInput = DirectInputForceFeedbackDevice.CreateIfAvailable();
-
         switch (outputMode)
         {
             case ForceFeedbackOutputMode.DirectInput:
-                AddIfPresent(devices, directInput);
+                AddIfPresent(devices, DirectInputForceFeedbackDevice.CreateIfAvailable());
                 break;
             case ForceFeedbackOutputMode.Preview:
                 break;
             default:
-                AddIfPresent(devices, directInput);
+                AddIfPresent(devices, DirectInputForceFeedbackDevice.CreateIfAvailable());
                 break;
         }
 

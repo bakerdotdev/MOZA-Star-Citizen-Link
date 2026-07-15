@@ -48,7 +48,7 @@ public sealed class ForceFeedbackController
         // Afterburner rumble: a deep rumble that swells in only while the engine is
         // held near its top (the analyzer's sustained-high detector). Flying at
         // normal throttle in space produces no afterburner signal -> no rumble.
-        var afterburnerIntensity = Clamp01(frame.Afterburner * 0.65);
+        var afterburnerIntensity = Clamp01(frame.Afterburner * 0.7);
         await UpdateStateAsync(
             "afterburner-rumble",
             afterburnerIntensity > 0.05,
@@ -63,15 +63,14 @@ public sealed class ForceFeedbackController
             updates,
             cancellationToken);
 
-        // Atmospheric rumble from the air-rush band. Boosted hard (~2.5x) so it's a
-        // real rumble, not a tickle — the air-rush signal reads low (~0.4-0.5 peak)
-        // and the old full-bodied feel actually came from the now-removed engine
-        // channel. The shouldRun threshold (not a floor) keeps faint air rush from
-        // firing a weak buzz.
-        var atmosphereIntensity = Clamp01(frame.Atmosphere * 2.5);
+        // Atmospheric rumble from the air-rush band (tonal-wind branch of the air
+        // detector). The signal reads ~0.4 in real atmospheric flight, so a modest
+        // boost gives a present-but-light texture. The shouldRun threshold keeps
+        // the small cruise leak from firing a buzz.
+        var atmosphereIntensity = Clamp01(frame.Atmosphere * 1.3);
         await UpdateStateAsync(
             "atmosphere",
-            atmosphereIntensity > 0.18,
+            atmosphereIntensity > 0.15,
             new ForceEffect(
                 ForceEffectKind.StateVibration,
                 "Telemetry atmosphere texture",

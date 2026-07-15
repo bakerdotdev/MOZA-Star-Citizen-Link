@@ -1,5 +1,28 @@
 # D-BOX Telemetry Interception — Handoff & Resume Plan
 
+> **Safety status (2026-07-14): archived; do not resume these interception
+> steps.** The current supported work is limited to
+> [offline SDK sample replay](dbox-sdk-sample-replay.md) and obtaining a
+> [vendor-sanctioned interface](vendor-telemetry-access-request.md). Do not use
+> the process, service, port, packet, spoofing, or production-file procedures
+> below with EAC.
+
+> **Superseded on 2026-07-14:** The downloaded SDK disproved this document's
+> architecture and hardware-blocker conclusion. StarCitizen.exe statically links
+> the Live Motion wrapper and directly loads the signed app-specific
+> dbxLive64.dll. The SDK's signed XML logger captured typed RegisterEvent and
+> PostEvent data without hardware. Use
+> [dbox-investigation-2026-07-14.md](dbox-investigation-2026-07-14.md) as the
+> current source of truth.
+>
+
+> **Evidence warning (2026-07-14):** This handoff records the earlier
+> investigation; it is not verified ground truth. The retained sweep stops at
+> 17/840, no saved API response proves that enumeration succeeded, and the
+> conclusion that real hardware is required is not established. Continue from
+> [dbox-investigation-2026-07-14.md](dbox-investigation-2026-07-14.md), which
+> audits these claims and gives the current investigation plan.
+
 **Status: PARKED (2026-06-11) — software-only spoofing cannot open the gate. Resume when a real D-BOX rig is available (borrowed or bought).**
 
 Goal: intercept the real-time telemetry Star Citizen sends to D-BOX (SC 4.8+ "Coded Gaming") and translate it into MOZA AB6 force feedback. This is the high-fidelity path (true motion data), as opposed to the shipping audio-DSP path (see `telemetry-inputs.md`).

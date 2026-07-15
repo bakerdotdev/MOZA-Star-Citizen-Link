@@ -1,5 +1,19 @@
 # D-BOX Proxy
 
+> **Safety status (2026-07-14): archived; do not install or run this proxy.**
+> Production-handler replacement and in-process interception are outside the
+> supported workflow. Use the [offline SDK sample replay](dbox-sdk-sample-replay.md)
+> and pursue a [vendor-sanctioned interface](vendor-telemetry-access-request.md).
+
+> **Correction (2026-07-14):** Static analysis of the official SDK and Star
+> Citizen 4.8 proves that StarCitizen.exe does load the ProgramData
+> app-specific dbxLive64.dll. The proxy below failed because the SDK validates a
+> D-BOX Authenticode signer before loading a handler, and because its socket
+> hooks target a downstream boundary. The SDK's signed XML logger is the
+> verified semantic capture tool. See
+> [dbox-investigation-2026-07-14.md](dbox-investigation-2026-07-14.md).
+>
+
 > **Status: superseded (2026-05-26).** The approach described here — proxying `dbxLive64.dll` inside `StarCitizen.exe` — does not work on SC 4.8. `StarCitizen.exe` never loads that DLL; no process on a hardware-less rig does. See [`dbox-telemetry-research.md`](dbox-telemetry-research.md) for the current goal, the architecture as we now understand it, and the chosen path forward (hooking `dbxService64.dll` inside `MotionEngine.exe`). This document is kept as a reference for the proxy-DLL technique itself, which is still the basis for the new approach — just applied at a different layer.
 
 ---

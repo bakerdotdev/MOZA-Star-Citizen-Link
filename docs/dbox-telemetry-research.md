@@ -1,5 +1,18 @@
 # D-BOX Telemetry Capture — Goal & Research State
 
+> **Safety status (2026-07-14): archived; do not execute the interception,
+> spoofing, service, port, packet, or production-file steps below.** The current
+> supported work is [offline SDK sample replay](dbox-sdk-sample-replay.md) plus a
+> request for a [vendor-sanctioned interface](vendor-telemetry-access-request.md).
+
+> **Superseded on 2026-07-14:** The official SDK audit recovered the actual
+> loader, signature validation, event-handler ABI, and Star Citizen schemas.
+> StarCitizen.exe directly loads the ProgramData app-specific handler, and the
+> SDK's signed XML logger works without D-BOX hardware. The MotionEngine-first
+> architecture and real-hardware requirement below are incorrect. Continue from
+> [dbox-investigation-2026-07-14.md](dbox-investigation-2026-07-14.md).
+>
+
 > **STATUS (2026-06-11): PARKED — pending real D-BOX hardware.** Software-only spoofing cracked the enumeration gate but cannot pass the system-generation classifier / MonitorServicePassthrough (these need real-device data; the deciding logic is in a NativeAOT binary). **Start with [`dbox-handoff.md`](dbox-handoff.md)** for the current state and the exact resume plan. Everything below is deeper background.
 
 This document captures the goal, the current understanding of the D-BOX/Star Citizen integration, and the open avenues for capturing Star Citizen telemetry by way of D-BOX. It is intended to let us resume this thread later without re-deriving everything.

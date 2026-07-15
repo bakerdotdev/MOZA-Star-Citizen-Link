@@ -21,12 +21,14 @@ public sealed class AudioDspOptions
 
     /// <summary>
     /// Process to capture via WASAPI per-process loopback (audio from only that
-    /// process tree — so music/browser/Discord never reach the analyzer). When
-    /// null, falls back to whole-device loopback (<see cref="DeviceNameContains"/>).
-    /// Controlled by MOZA_SC_AUDIO_SOURCE: unset/"process" =&gt; "StarCitizen";
-    /// "device" =&gt; device loopback; any other value =&gt; that process name.
+    /// process tree). When null (the default), captures the whole default render
+    /// endpoint instead (<see cref="DeviceNameContains"/>).
+    /// Controlled by MOZA_SC_AUDIO_SOURCE: unset/"device"/"auto" =&gt; whole-device
+    /// loopback (the reliable default — per-process loopback of StarCitizen is
+    /// blocked by EAC); "process"/"starcitizen" =&gt; StarCitizen per-process;
+    /// any other value =&gt; that process name.
     /// </summary>
-    public string? CaptureProcessName { get; init; } = "StarCitizen";
+    public string? CaptureProcessName { get; init; }
 
     public static AudioDspOptions FromEnvironment()
     {
@@ -43,8 +45,11 @@ public sealed class AudioDspOptions
         var raw = Trim(Environment.GetEnvironmentVariable("MOZA_SC_AUDIO_SOURCE"));
         return raw?.ToLowerInvariant() switch
         {
-            null or "process" or "auto" or "starcitizen" => "StarCitizen",
-            "device" or "loopback" => null,
+            // Default: whole-device loopback of the default render endpoint. Per-
+            // process loopback of StarCitizen is unreliable (EAC-protected process),
+            // so it's opt-in via MOZA_SC_AUDIO_SOURCE=process.
+            null or "device" or "loopback" or "auto" => null,
+            "process" or "starcitizen" => "StarCitizen",
             _ => raw!.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? raw[..^4] : raw
         };
     }
