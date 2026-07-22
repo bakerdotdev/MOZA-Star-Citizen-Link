@@ -31,6 +31,8 @@ public sealed class DBoxHaptiSyncTelemetrySource : IStarCitizenTelemetrySource
 
     public string Status => _status;
 
+    public TelemetryOutputPolicy OutputPolicy => TelemetryOutputPolicy.EffectsAllowed;
+
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         try

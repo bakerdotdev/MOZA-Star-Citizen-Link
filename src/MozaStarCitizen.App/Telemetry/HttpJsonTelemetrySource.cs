@@ -28,6 +28,8 @@ public sealed class HttpJsonTelemetrySource : IStarCitizenTelemetrySource
 
     public string Status => _status;
 
+    public TelemetryOutputPolicy OutputPolicy => TelemetryOutputPolicy.EffectsAllowed;
+
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, _endpoint);

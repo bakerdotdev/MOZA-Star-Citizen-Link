@@ -21,8 +21,18 @@
              Link="Telemetry\DBoxSdkXmlLogParser.cs" />
     <Compile Include="..\..\src\MozaStarCitizen.App\Telemetry\DBoxSdkLog\DBoxSdkSampleTelemetryMapper.cs"
              Link="Telemetry\DBoxSdkSampleTelemetryMapper.cs" />
+    <Compile Include="..\..\src\MozaStarCitizen.App\Telemetry\DBoxSdkLog\DBoxSdkSampleLogSession.cs"
+             Link="Telemetry\DBoxSdkSampleLogSession.cs" />
     <Compile Include="..\..\src\MozaStarCitizen.App\Telemetry\DBoxSdkLog\DBoxSdkSampleLogTelemetrySource.cs"
              Link="Telemetry\DBoxSdkSampleLogTelemetrySource.cs" />
+    <Compile Include="..\..\src\MozaStarCitizen.App\Telemetry\DBoxSdkLog\DBoxSdkSampleFramePreview.cs"
+             Link="Telemetry\DBoxSdkSampleFramePreview.cs" />
+    <Compile Include="..\..\src\MozaStarCitizen.App\Models\ForceEffect.cs"
+             Link="Models\ForceEffect.cs" />
+    <Compile Include="..\..\src\MozaStarCitizen.App\ForceFeedback\IForceFeedbackDevice.cs"
+             Link="ForceFeedback\IForceFeedbackDevice.cs" />
+    <Compile Include="..\..\src\MozaStarCitizen.App\ForceFeedback\ForceFeedbackController.cs"
+             Link="ForceFeedback\ForceFeedbackController.cs" />
   </ItemGroup>
 
 </Project>

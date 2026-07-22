@@ -1,9 +1,17 @@
+using MozaStarCitizen.App.Telemetry;
+
 namespace MozaStarCitizen.App.ForceFeedback;
 
 public static class ForceFeedbackDeviceFactory
 {
-    public static IForceFeedbackDevice Create()
+    public static IForceFeedbackDevice Create(TelemetryOutputPolicy outputPolicy)
     {
+        if (outputPolicy == TelemetryOutputPolicy.VisualizationOnly)
+        {
+            return new NullForceFeedbackDevice(
+                "The selected telemetry source is visualization-only. Hardware effects are disabled.");
+        }
+
         var outputMode = ParseOutputMode(Environment.GetEnvironmentVariable("MOZA_SC_OUTPUT"));
         var devices = new List<IForceFeedbackDevice>();
 
@@ -19,7 +27,8 @@ public static class ForceFeedbackDeviceFactory
                 break;
         }
 
-        devices.Add(new NullForceFeedbackDevice($"Output mode '{outputMode}' had no working DirectInput hardware output. Effects are preview-only."));
+        devices.Add(new NullForceFeedbackDevice(
+            $"Output mode '{outputMode}' had no working DirectInput hardware output. Effects are preview-only."));
 
         return new FallbackForceFeedbackDevice(devices);
     }

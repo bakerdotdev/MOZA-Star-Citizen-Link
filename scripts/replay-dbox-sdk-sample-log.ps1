@@ -68,7 +68,7 @@ Write-Host "  Log:    $resolvedLog"
 Write-Host "  AppKey: $appKey"
 Write-Host "  Mode:   Replay"
 Write-Host "  Speed:  $env:MOZA_SC_DBOX_REPLAY_SPEED"
-Write-Host "  Output: $env:MOZA_SC_OUTPUT"
+Write-Host "  Output: $env:MOZA_SC_OUTPUT (visualization-only; hardware disabled)"
 Write-Host ""
 Write-Host "The AppKey is self-asserted and is not a cryptographic proof of provenance." -ForegroundColor DarkGray
 Write-Host "This reads only the selected local sample log. It does not access Star Citizen, EAC, D-BOX services, handlers, registry, or network endpoints." -ForegroundColor DarkGray

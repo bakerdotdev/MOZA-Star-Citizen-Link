@@ -89,6 +89,79 @@ public static class DBoxSdkLocalFilePolicy
 
         return fullPath;
     }
+
+    public static string GetValidatedExistingFilePath(
+        string path,
+        bool requireFullyQualified = false)
+    {
+        if (requireFullyQualified && !Path.IsPathFullyQualified(path))
+        {
+            throw new ArgumentException(
+                "The D-BOX SDK sample log path must be absolute.",
+                nameof(path));
+        }
+
+        var fullPath = GetValidatedPath(path);
+        if (fullPath.IndexOf(':', 2) >= 0)
+        {
+            throw new ArgumentException(
+                "Alternate data streams are not accepted.",
+                nameof(path));
+        }
+
+        var root = Path.GetPathRoot(fullPath) ??
+            throw new ArgumentException(
+                "The D-BOX SDK sample log path has no local drive root.",
+                nameof(path));
+        var current = root;
+        var finalAttributes = GetExistingAttributes(current, fullPath);
+        if ((finalAttributes & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new ArgumentException(
+                "Reparse-point paths are not accepted.",
+                nameof(path));
+        }
+
+        foreach (var component in fullPath[root.Length..].Split(
+                     [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, component);
+            finalAttributes = GetExistingAttributes(current, fullPath);
+            if ((finalAttributes & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new ArgumentException(
+                    "Symlinks, junctions, mount points, and other reparse paths are not accepted.",
+                    nameof(path));
+            }
+        }
+
+        if ((finalAttributes & FileAttributes.Directory) != 0)
+        {
+            throw new ArgumentException(
+                "The D-BOX SDK sample log path must identify an existing ordinary file.",
+                nameof(path));
+        }
+
+        return fullPath;
+    }
+
+    private static FileAttributes GetExistingAttributes(
+        string componentPath,
+        string requestedFile)
+    {
+        try
+        {
+            return File.GetAttributes(componentPath);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            throw new FileNotFoundException(
+                "The explicit D-BOX SDK sample log was not found; no path search was performed.",
+                requestedFile,
+                ex);
+        }
+    }
 }
 
 public sealed record DBoxSdkLogRecord

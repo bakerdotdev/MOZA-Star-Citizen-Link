@@ -72,12 +72,19 @@ The SDK `ApiKey` is deliberately not emitted. The `AppKey` is retained as a
 provenance label, but it is self-asserted XML—not cryptographic proof that D-BOX
 created the file.
 
-The observer fails closed on malformed XML, comments or processing instructions,
-unknown methods, incorrect method IDs, unsupported application labels,
-schema/payload conditions detected by the sample mapper, lifecycle-order errors,
-timestamp regression, duplicate initialization, records after termination, file
-truncation, and resource limits.
+The observer uses the same strict record/session validator as the offline
+inspector and app replay. It fails closed on malformed XML, comments or
+processing instructions, unknown methods, incorrect or missing method IDs,
+unsupported application labels, schema/payload errors, lifecycle-order errors,
+timestamp regression, duplicate initialization, records after termination,
+missing termination, and resource limits. Its streaming layer additionally
+rejects file truncation and times out an idle, incomplete run.
 It accepts only the official sample labels `SampleRacer` and `SampleFlyer`.
+
+Because NDJSON is streamed, records already emitted remain visible if a later
+record makes the run invalid. App replay has a different output guarantee: it
+prevalidates a stable, read-locked finished file in full before yielding any
+Preview frames.
 
 ## What this tells us about the hardware spoof
 

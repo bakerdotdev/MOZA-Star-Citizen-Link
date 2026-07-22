@@ -2,11 +2,19 @@ using System.Runtime.CompilerServices;
 
 namespace MozaStarCitizen.App.Telemetry;
 
+public enum TelemetryOutputPolicy
+{
+    EffectsAllowed,
+    VisualizationOnly
+}
+
 public interface IStarCitizenTelemetrySource : IAsyncDisposable
 {
     string Name { get; }
 
     string Status { get; }
+
+    TelemetryOutputPolicy OutputPolicy { get; }
 
     Task InitializeAsync(CancellationToken cancellationToken);
 
@@ -17,9 +25,18 @@ public interface IStarCitizenTelemetrySource : IAsyncDisposable
 
 public sealed class NoTelemetrySource : IStarCitizenTelemetrySource
 {
+    private readonly TelemetryOutputPolicy _outputPolicy;
+
+    public NoTelemetrySource(TelemetryOutputPolicy outputPolicy)
+    {
+        _outputPolicy = outputPolicy;
+    }
+
     public string Name => "No telemetry source";
 
     public string Status => "No telemetry source is configured.";
+
+    public TelemetryOutputPolicy OutputPolicy => _outputPolicy;
 
     public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 

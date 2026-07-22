@@ -116,6 +116,13 @@ Replay the same file into Preview output:
 .\scripts\replay-dbox-sdk-sample-log.ps1 -LogPath "D:\path\to\dbxLive64_sample.log"
 ```
 
+The app activity feed shows compact engine, G-force, boost, impact, gear, and
+lifecycle summaries while the finite replay runs. The source is typed as
+visualization-only, so the app forces Preview output and bypasses the
+force-feedback controller even if DirectInput was requested elsewhere. Before
+the first Preview frame, it validates the complete, read-locked file through a
+terminal `Terminate` using the same strict rules as the inspector and observer.
+
 Follow an already-existing sample-format file while its authorized SDK producer
 is appending records:
 
@@ -151,7 +158,7 @@ current controller intentionally drives only afterburner rumble and atmospheric
 texture because the audio source cannot reliably disambiguate the other effects.
 The SDK sample replay populates engine/G/boost/impact/gear fields for Preview
 inspection but does not relabel them as afterburner or atmosphere merely to make
-the hardware move.
+the hardware move. It is display-only and cannot reach hardware output.
 
 The `Stop Effects` button stops all sustained and transient effects.
 

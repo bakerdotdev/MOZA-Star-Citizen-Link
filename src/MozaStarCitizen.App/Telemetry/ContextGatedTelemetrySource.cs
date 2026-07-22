@@ -54,6 +54,8 @@ public sealed class ContextGatedTelemetrySource : IStarCitizenTelemetrySource
         ? _inner.Status
         : $"[gated: {GateReason}] {_inner.Status}";
 
+    public TelemetryOutputPolicy OutputPolicy => _inner.OutputPolicy;
+
     private bool EnginePresent => !_engineGate || _enginePresent;
 
     private bool Active => _context.InFlight && (_foreground?.IsFocused ?? true) && EnginePresent;

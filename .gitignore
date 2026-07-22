@@ -6,6 +6,7 @@ AGENTS.md
 bin/
 obj/
 artifacts/
+tmp/
 third_party/moza-sdk/sdk-local/
 *.user
 *.suo

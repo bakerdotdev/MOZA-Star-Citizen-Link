@@ -43,6 +43,11 @@ public sealed class ForceFeedbackController
 
     public async Task<string> HandleTelemetryAsync(StarCitizenTelemetryFrame frame, CancellationToken cancellationToken)
     {
+        if (frame.SourceKind == TelemetrySourceKind.DBoxSdkSample)
+        {
+            return "D-BOX SDK sample frame blocked by the visualization-only output policy.";
+        }
+
         var updates = new List<string>();
 
         // Afterburner rumble: a deep rumble that swells in only while the engine is

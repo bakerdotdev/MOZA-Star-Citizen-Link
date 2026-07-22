@@ -76,7 +76,11 @@ public sealed class DBoxSdkSampleTelemetryMapper
                 ClearDynamicState();
                 if (IsSupportedSample)
                 {
-                    frame = CreateFrame(record, impact: 0);
+                    frame = CreateFrame(
+                        record,
+                        impact: 0,
+                        TelemetrySignalSet.None,
+                        TelemetryFrameBoundary.Stop);
                     return true;
                 }
 
@@ -93,7 +97,17 @@ public sealed class DBoxSdkSampleTelemetryMapper
                 ClearAllState();
                 if (IsSupportedSample)
                 {
-                    frame = CreateFrame(record, impact: 0);
+                    frame = CreateFrame(
+                        record,
+                        impact: 0,
+                        TelemetrySignalSet.None,
+                        record.Method switch
+                        {
+                            "ResetState" => TelemetryFrameBoundary.ResetState,
+                            "Close" => TelemetryFrameBoundary.Close,
+                            "Terminate" => TelemetryFrameBoundary.Terminate,
+                            _ => TelemetryFrameBoundary.None
+                        });
                     return true;
                 }
 
@@ -195,17 +209,19 @@ public sealed class DBoxSdkSampleTelemetryMapper
         }
 
         double? eventIntensity = null;
+        var updatedSignals = TelemetrySignalSet.None;
         for (var index = 0; index < schema.Fields.Count; index++)
         {
             var field = schema.Fields[index];
             var value = record.Values[index];
-            if (!ApplyField(field, value, ref eventIntensity))
+            if (!ApplyField(field, value, ref eventIntensity, out var fieldSignals))
             {
                 UnmappedFieldCount++;
             }
             else
             {
                 MappedFieldCount++;
+                updatedSignals |= fieldSignals;
             }
         }
 
@@ -216,19 +232,30 @@ public sealed class DBoxSdkSampleTelemetryMapper
                 _engineRpm = 0;
                 _engineN1 = 0;
                 _boost = 0;
+                updatedSignals |=
+                    TelemetrySignalSet.EngineRumble |
+                    TelemetrySignalSet.EngineFrequency |
+                    TelemetrySignalSet.Boost;
                 break;
             case EventEngineBoostStart:
                 _boost = Clamp01(eventIntensity ?? 1);
+                updatedSignals |= TelemetrySignalSet.Boost;
                 break;
             case EventEngineBoostStop:
                 _boost = 0;
+                updatedSignals |= TelemetrySignalSet.Boost;
                 break;
             case EventImpact:
                 impact = Clamp01(eventIntensity ?? 1);
+                updatedSignals |= TelemetrySignalSet.Impact;
                 break;
         }
 
-        frame = CreateFrame(record, impact);
+        frame = CreateFrame(
+            record,
+            impact,
+            updatedSignals,
+            TelemetryFrameBoundary.None);
         return true;
     }
 
@@ -342,16 +369,32 @@ public sealed class DBoxSdkSampleTelemetryMapper
     private bool ApplyField(
         DBoxSdkFieldDefinition field,
         DBoxSdkPostedValue value,
-        ref double? eventIntensity)
+        ref double? eventIntensity,
+        out TelemetrySignalSet updatedSignals)
     {
+        updatedSignals = TelemetrySignalSet.None;
         switch (field.MeaningId)
         {
             case FieldEngineRpm:
-                return TryAssignScalar(value, scalar => _engineRpm = Math.Max(0, scalar));
+                if (!TryAssignScalar(value, scalar => _engineRpm = Math.Max(0, scalar)))
+                {
+                    return false;
+                }
+
+                updatedSignals =
+                    TelemetrySignalSet.EngineRumble |
+                    TelemetrySignalSet.EngineFrequency;
+                return true;
             case FieldEngineRpmMax:
                 return TryAssignScalar(value, scalar => _engineRpmMax = Math.Max(0, scalar));
             case FieldAccelerationXyz:
-                return TryAssignVector(value, vector => _acceleration = vector);
+                if (!TryAssignVector(value, vector => _acceleration = vector))
+                {
+                    return false;
+                }
+
+                updatedSignals = TelemetrySignalSet.GForce;
+                return true;
             case FieldEventIntensity:
                 if (!value.TryGetScalar(out var intensity))
                 {
@@ -361,23 +404,51 @@ public sealed class DBoxSdkSampleTelemetryMapper
                 eventIntensity = Clamp01(intensity);
                 return true;
             case FieldEngineBoost:
-                return TryAssignScalar(value, scalar => _boost = Clamp01(scalar));
+                if (!TryAssignScalar(value, scalar => _boost = Clamp01(scalar)))
+                {
+                    return false;
+                }
+
+                updatedSignals = TelemetrySignalSet.Boost;
+                return true;
             case FieldActorGForceXyz:
-                return TryAssignVector(value, vector => _actorGForce = vector);
+                if (!TryAssignVector(value, vector => _actorGForce = vector))
+                {
+                    return false;
+                }
+
+                updatedSignals = TelemetrySignalSet.GForce;
+                return true;
             case FieldLandingGearDeployment:
-                return TryAssignScalar(value, scalar => _landingGear = Clamp01(scalar));
+                if (!TryAssignScalar(value, scalar => _landingGear = Clamp01(scalar)))
+                {
+                    return false;
+                }
+
+                updatedSignals = TelemetrySignalSet.LandingGear;
+                return true;
             case FieldEngine1N1:
-                return TryAssignScalar(value, scalar =>
+                if (!TryAssignScalar(value, scalar =>
                 {
                     var normalized = scalar <= 1 ? scalar : scalar / 100;
                     _engineN1 = Clamp01(normalized);
-                });
+                }))
+                {
+                    return false;
+                }
+
+                updatedSignals = TelemetrySignalSet.EngineRumble;
+                return true;
             default:
                 return false;
         }
     }
 
-    private StarCitizenTelemetryFrame CreateFrame(DBoxSdkLogRecord record, double impact)
+    private StarCitizenTelemetryFrame CreateFrame(
+        DBoxSdkLogRecord record,
+        double impact,
+        TelemetrySignalSet updatedSignals,
+        TelemetryFrameBoundary boundary)
     {
         var gForce = _actorGForce ??
             (_acceleration is { } acceleration
@@ -398,7 +469,11 @@ public sealed class DBoxSdkSampleTelemetryMapper
         return new StarCitizenTelemetryFrame
         {
             Timestamp = GetTimestamp(record),
-            Source = "D-BOX SDK sample XML replay",
+            Source = $"D-BOX SDK {AppKey} XML replay",
+            SourceKind = TelemetrySourceKind.DBoxSdkSample,
+            ApplicationKey = AppKey,
+            UpdatedSignals = updatedSignals,
+            Boundary = boundary,
             EngineRumble = engineRumble,
             EngineFrequencyHz = engineFrequency,
             GForceLateral = gForce.X,

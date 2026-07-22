@@ -69,6 +69,14 @@ Replay it with Preview output:
 .\scripts\replay-dbox-sdk-sample-log.ps1 -LogPath "D:\path\to\dbxLive64_sample.log"
 ```
 
+The activity feed renders concise sample-provenance summaries, including
+zero-valued boost and gear transitions and lifecycle resets. This source has a
+`VisualizationOnly` output policy: it forces a null Preview device and bypasses
+the force-feedback controller regardless of the configured hardware-output
+mode. It holds the finished log read-only, validates the entire file with the
+same strict session rules used by the inspector and observer, and yields no
+Preview frames unless that preflight succeeds through terminal `Terminate`.
+
 Follow one already-existing sample-format file as strict NDJSON without launching
 the app or producer:
 
@@ -77,9 +85,9 @@ the app or producer:
 ```
 
 This validates the schema-aware parser and normalized frame model. It does not
-capture live Star Citizen data, and the current two-signal FFB controller does not
-turn the sample-only G/load/engine/boost/impact/gear meanings into hardware
-effects. Full instructions and mappings are in
+capture live Star Citizen data or turn the
+sample-only G/load/engine/boost/impact/gear meanings into hardware effects. Full
+instructions and mappings are in
 [`dbox-sdk-sample-replay.md`](dbox-sdk-sample-replay.md); the streaming boundary
 and why a hardware-presence spoof is not itself a telemetry source are in
 [`dbox-sdk-sample-observer.md`](dbox-sdk-sample-observer.md).

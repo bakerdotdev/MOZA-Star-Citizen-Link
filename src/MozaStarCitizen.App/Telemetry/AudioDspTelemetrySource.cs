@@ -65,6 +65,8 @@ public sealed class AudioDspTelemetrySource : IStarCitizenTelemetrySource
 
     public string Status => _status;
 
+    public TelemetryOutputPolicy OutputPolicy => TelemetryOutputPolicy.EffectsAllowed;
+
     public Task InitializeAsync(CancellationToken cancellationToken)
     {
         lock (_lifecycleLock)

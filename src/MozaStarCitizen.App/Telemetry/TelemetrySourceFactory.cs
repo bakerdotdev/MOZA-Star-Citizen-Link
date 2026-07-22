@@ -20,7 +20,7 @@ public static class TelemetrySourceFactory
             TelemetrySourceMode.OfficialHttp when !string.IsNullOrWhiteSpace(configuredUrl) =>
                 new HttpJsonTelemetrySource("Official HTTP telemetry", configuredUrl),
             TelemetrySourceMode.OfficialHttp =>
-                new NoTelemetrySource(),
+                new NoTelemetrySource(TelemetryOutputPolicy.EffectsAllowed),
             TelemetrySourceMode.DBoxHaptiSync =>
                 new DBoxHaptiSyncTelemetrySource(),
             TelemetrySourceMode.DBoxSdkSampleLog when !string.IsNullOrWhiteSpace(configuredDBoxLog) =>
@@ -28,11 +28,11 @@ public static class TelemetrySourceFactory
                     configuredDBoxLog,
                     ParseReplaySpeed(Environment.GetEnvironmentVariable("MOZA_SC_DBOX_REPLAY_SPEED"))),
             TelemetrySourceMode.DBoxSdkSampleLog =>
-                new NoTelemetrySource(),
+                new NoTelemetrySource(TelemetryOutputPolicy.VisualizationOnly),
             TelemetrySourceMode.AudioDsp =>
                 new AudioDspTelemetrySource(),
             TelemetrySourceMode.Preview =>
-                new NoTelemetrySource(),
+                new NoTelemetrySource(TelemetryOutputPolicy.VisualizationOnly),
             _ when !string.IsNullOrWhiteSpace(configuredUrl) =>
                 new HttpJsonTelemetrySource("Configured HTTP telemetry", configuredUrl),
             _ =>
